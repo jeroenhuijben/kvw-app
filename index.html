@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f7f9fc" />
+    <title>KVW app</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="phone-shell" aria-label="App voor ochtendaanwezigheid">
+      <header class="topbar">
+        <img class="header-logo" src="./kvw-logo.png" alt="KVW De Noordhoek" />
+        <h1>KVW app</h1>
+        <button class="icon-button" id="menuButton" type="button" aria-label="Menu openen">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16" />
+          </svg>
+        </button>
+      </header>
+
+      <div class="user-strip" id="userStrip">
+        <span id="currentUserLabel">Kies gebruiker</span>
+        <button class="text-button" id="switchUserButton" type="button">Wissel</button>
+      </div>
+
+      <section class="selector-strip" data-attendance-chrome aria-label="Aanwezigheidsselectie">
+        <label class="select-control">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+          </svg>
+          <select id="groupSelect" aria-label="Kies groep"></select>
+        </label>
+        <span class="divider" aria-hidden="true"></span>
+        <label class="select-control">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 2v4M16 2v4M3 10h18" />
+            <rect x="3" y="4" width="18" height="18" rx="2" />
+          </svg>
+          <select id="daySelect" aria-label="Kies dag"></select>
+        </label>
+      </section>
+
+      <section class="summary" data-attendance-chrome aria-live="polite">
+        <article>
+          <span class="summary-icon present-icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 13 4 4L19 7" /></svg>
+          </span>
+          <div>
+            <strong id="presentCount">0</strong>
+            <span>aanwezig</span>
+          </div>
+        </article>
+        <span class="divider" aria-hidden="true"></span>
+        <article>
+          <span class="summary-icon missing-icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v6M12 17h.01" /></svg>
+          </span>
+          <div>
+            <strong id="missingCount">0</strong>
+            <span>afwezig</span>
+          </div>
+        </article>
+      </section>
+
+      <section class="search-band" data-attendance-chrome>
+        <label class="search-box">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.35-4.35" />
+          </svg>
+          <input id="searchInput" type="search" placeholder="Zoek kind" autocomplete="off" />
+        </label>
+      </section>
+
+      <section class="content-view" id="homeView" aria-label="Start">
+        <button class="critical-banner hidden" id="criticalInfoBanner" type="button" data-home-target="contactsView">
+          <span>Kritische melding</span>
+          <strong id="criticalInfoBannerText"></strong>
+        </button>
+        <div class="home-dashboard">
+          <button class="home-tile schedule-tile" type="button" data-home-target="scheduleView">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M8 2v4M16 2v4M3 10h18" />
+              <rect x="3" y="4" width="18" height="18" rx="2" />
+            </svg>
+            <span>Programma</span>
+          </button>
+          <button class="home-tile attendance-tile" type="button" data-home-target="todayView">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m5 13 4 4L19 7" />
+            </svg>
+            <span>Aanwezigheid</span>
+          </button>
+          <button class="home-tile feedback-tile" type="button" data-home-target="feedbackView">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z" />
+            </svg>
+            <span>Evaluatie</span>
+          </button>
+          <button class="home-tile contacts-tile" type="button" data-home-target="contactsView">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 8v5M12 17h.01" />
+            </svg>
+            <span>Belangrijke info</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="content-view hidden" id="todayView" aria-label="Aanwezigheid">
+        <div class="list-toolbar">
+          <p id="saveStatus">Nog niet opgeslagen</p>
+          <button class="text-button" id="markAllButton" type="button">Iedereen aanwezig</button>
+        </div>
+        <div class="child-list" id="childList"></div>
+      </section>
+
+      <section class="content-view hidden" id="scheduleView" aria-label="Programma">
+        <div class="section-title">
+          <h2>Programma</h2>
+          <p id="scheduleDateLabel">Maandag 17 augustus</p>
+        </div>
+        <div class="schedule-toolbar">
+          <button class="icon-button schedule-day-button" id="prevScheduleDay" type="button" aria-label="Vorige dag">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+          </button>
+          <div class="schedule-day-card">
+            <strong id="scheduleDayName">Maandag</strong>
+            <span id="scheduleDayRange">17 aug 2026</span>
+          </div>
+          <button class="icon-button schedule-day-button" id="nextScheduleDay" type="button" aria-label="Volgende dag">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+          </button>
+        </div>
+        <div class="category-switch" id="scheduleCategorySwitch" aria-label="Kies categorie"></div>
+        <div class="schedule-board" id="scheduleBoard" aria-label="Dagprogramma"></div>
+      </section>
+
+      <section class="content-view hidden" id="feedbackView" aria-label="Evaluatie">
+        <div class="section-title">
+          <h2>Evaluatie</h2>
+          <p>Deel alles wat handig is voor het organisatieteam.</p>
+        </div>
+        <div class="feedback-layout">
+          <form class="feedback-form" id="feedbackForm">
+            <label for="feedbackCategory">Categorie</label>
+            <select id="feedbackCategory">
+              <option value="Algemeen">Algemeen</option>
+              <option value="Kind">Kind</option>
+              <option value="Activiteit">Activiteit</option>
+              <option value="Veiligheid">Veiligheid</option>
+              <option value="Materiaal">Materiaal</option>
+              <option value="Overig">Overig</option>
+            </select>
+            <label for="feedbackText">Evaluatie</label>
+            <textarea id="feedbackText" rows="7" placeholder="Wat is er gebeurd? Wat moeten bestuursleden weten?"></textarea>
+            <button type="submit">Evaluatie versturen</button>
+          </form>
+
+          <section class="manager-feedback" aria-label="Ingediende evaluaties">
+            <div class="feedback-overview-header">
+              <h3>Ingediende evaluaties</h3>
+              <button class="text-button admin-only" id="clearFeedbackButton" type="button">Alles verwijderen</button>
+            </div>
+            <div class="confirm-panel hidden" id="clearFeedbackConfirm">
+              <p>Hiermee verwijder je alle ingediende evaluaties definitief.</p>
+              <div>
+                <button class="danger-button" id="confirmClearFeedbackButton" type="button">Verwijderen</button>
+                <button class="text-button" id="cancelClearFeedbackButton" type="button">Annuleren</button>
+              </div>
+            </div>
+            <div class="feedback-list" id="feedbackList"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="content-view hidden" id="contactsView" aria-label="Belangrijke info">
+        <div class="section-title">
+          <h2>Belangrijke info</h2>
+          <p>Actuele meldingen voor de week.</p>
+        </div>
+        <div class="important-info-layout">
+          <form class="important-info-form admin-only" id="importantInfoForm">
+            <label for="importantInfoUrgency">Urgentie</label>
+            <select id="importantInfoUrgency">
+              <option value="low">Laag</option>
+              <option value="medium">Gemiddeld</option>
+              <option value="critical">Kritisch</option>
+            </select>
+            <label for="importantInfoTitle">Titel</label>
+            <input id="importantInfoTitle" type="text" placeholder="Korte titel" autocomplete="off" />
+            <label for="importantInfoText">Informatie</label>
+            <textarea id="importantInfoText" rows="6" placeholder="Belangrijke informatie"></textarea>
+            <button type="submit">Info plaatsen</button>
+          </form>
+          <div class="important-info-list" id="importantInfoList"></div>
+        </div>
+      </section>
+
+      <section class="content-view hidden" id="groupsView" aria-label="Groepen">
+        <div class="section-title">
+          <h2>Groepen</h2>
+          <p>Wissel van groep en bekijk welke leiders zijn gekoppeld.</p>
+        </div>
+        <div class="group-grid" id="groupCards"></div>
+      </section>
+
+      <section class="content-view hidden" id="kidsView" aria-label="Kinderen">
+        <div class="section-title">
+          <h2>Kinderen</h2>
+          <p>Bekijk direct in welke groep kinderen zijn ingedeeld.</p>
+        </div>
+        <form class="add-form" id="addKidForm">
+          <input id="newKidName" type="text" placeholder="Naam kind" autocomplete="off" />
+          <button type="submit">Toevoegen</button>
+        </form>
+        <div class="manage-list" id="manageList"></div>
+      </section>
+
+      <section class="content-view hidden" id="managementView" aria-label="Beheer">
+        <div class="management-lock" id="managementLock">
+          <div class="lock-card">
+            <div class="lock-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <rect x="4" y="10" width="16" height="11" rx="2" />
+                <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+              </svg>
+            </div>
+            <h2>Beheer vergrendeld</h2>
+            <p>Voer het bestuurswachtwoord in om groepen, kinderen en leiders te bewerken.</p>
+            <form class="unlock-form" id="unlockForm">
+              <input id="managerPassword" type="password" placeholder="Wachtwoord" autocomplete="current-password" />
+              <button type="submit">Ontgrendelen</button>
+            </form>
+          </div>
+        </div>
+
+        <div class="management-workspace hidden" id="managementWorkspace">
+          <div class="section-title management-title">
+            <div>
+              <h2>Instellingen</h2>
+              <p id="managementIntro">Beheer toegang, gebruikers, groepen en kinderen.</p>
+            </div>
+            <button class="text-button" id="lockManagementButton" type="button">Vergrendelen</button>
+          </div>
+          <div class="manager-layout">
+            <section class="manager-section">
+              <div class="manager-section-header">
+                <h3>Toegang</h3>
+                <p>Pincodes voor jezelf en als bestuurslid ook voor anderen.</p>
+              </div>
+              <form class="manager-form" id="changeOwnPinForm">
+                <label for="ownPinInput">Mijn pincode wijzigen</label>
+                <div>
+                  <input id="ownPinInput" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Nieuwe pincode" autocomplete="one-time-code" />
+                  <button type="submit">Bijwerken</button>
+                </div>
+              </form>
+              <div class="theme-choice" aria-label="Kies thema">
+                <span>Thema</span>
+                <div class="theme-toggle" id="themeToggle">
+                  <button type="button" data-theme-option="light">Licht</button>
+                  <button type="button" data-theme-option="dark">Donker</button>
+                </div>
+              </div>
+              <form class="admin-only manager-form" id="resetPinForm">
+                <label for="resetPinUser">Pincode gebruiker resetten</label>
+                <select id="resetPinUser" aria-label="Kies gebruiker om pincode te resetten"></select>
+                <div>
+                  <input id="resetPinInput" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Nieuwe pincode" autocomplete="one-time-code" />
+                  <button type="submit">Resetten</button>
+                </div>
+              </form>
+            </section>
+
+            <section class="admin-only manager-section">
+              <div class="manager-section-header">
+                <h3>Overzicht</h3>
+                <p>Snelle telling van groepen, kinderen en gebruikers.</p>
+              </div>
+              <div class="manager-stats" id="managerStats"></div>
+            </section>
+
+            <section class="admin-only manager-section">
+              <div class="manager-section-header">
+                <h3>Gebruikers</h3>
+                <p>Voeg groepsleiders en bestuursleden toe. Daarna kun je leiders aan groepen koppelen.</p>
+              </div>
+              <div class="manager-user-grid">
+                <div class="manager-user-block">
+                  <form class="manager-form" id="addLeaderForm">
+                    <label for="newLeaderName">Groepsleiders</label>
+                    <div>
+                      <input id="newLeaderName" type="text" placeholder="Naam leider" autocomplete="off" />
+                      <button type="submit">Toevoegen</button>
+                    </div>
+                  </form>
+                  <div class="leader-list" id="leadersList"></div>
+                </div>
+                <div class="manager-user-block">
+                  <form class="manager-form" id="addManagerForm">
+                    <label for="newManagerName">Bestuursleden</label>
+                    <div>
+                      <input id="newManagerName" type="text" placeholder="Naam bestuurslid" autocomplete="off" />
+                      <button type="submit">Toevoegen</button>
+                    </div>
+                  </form>
+                  <div class="leader-list" id="managersList"></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="admin-only manager-section">
+              <div class="manager-section-header">
+                <h3>Bulk import</h3>
+                <p>Upload meerdere kinderen of gebruikers tegelijk vanuit een CSV-bestand.</p>
+              </div>
+              <div class="bulk-import-grid">
+                <form class="manager-form bulk-import-form" id="bulkKidsForm">
+                  <label for="bulkKidsCsv">Kinderen importeren</label>
+                  <input id="bulkKidsCsv" type="file" accept=".csv,text/csv" />
+                  <p>CSV-kolommen: naam, groep</p>
+                  <button type="submit">Kinderen importeren</button>
+                </form>
+                <form class="manager-form bulk-import-form" id="bulkUsersForm">
+                  <label for="bulkUsersCsv">Gebruikers importeren</label>
+                  <input id="bulkUsersCsv" type="file" accept=".csv,text/csv" />
+                  <p>CSV-kolommen: naam, rol, groepen</p>
+                  <button type="submit">Gebruikers importeren</button>
+                </form>
+              </div>
+              <p class="bulk-import-status" id="bulkImportStatus"></p>
+            </section>
+
+            <section class="admin-only manager-section">
+              <div class="manager-section-header">
+                <h3>Groepen en kinderen</h3>
+                <p>Maak groepen, koppel leiders en beheer kinderen per groep.</p>
+              </div>
+              <form class="manager-form manager-create-group" id="createGroupForm">
+                <label for="newGroupName">Nieuwe groep</label>
+                <div>
+                  <input id="newGroupName" type="text" placeholder="Groepsnaam" autocomplete="off" />
+                  <button type="submit">Aanmaken</button>
+                </div>
+              </form>
+              <div class="manager-groups" id="managerGroups" aria-label="Groepen beheren"></div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <div class="save-dock" id="saveDock">
+        <button class="primary-action" id="saveButton" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
+            <path d="M17 21v-8H7v8M7 3v5h8" />
+          </svg>
+          Check opslaan
+        </button>
+      </div>
+
+      <nav class="bottom-nav" aria-label="Hoofdnavigatie">
+        <button class="active" type="button" data-view="homeView" aria-label="Start">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 10.5 12 3l9 7.5" />
+            <path d="M5 10v11h14V10" />
+          </svg>
+          <span>Start</span>
+        </button>
+        <button type="button" data-view="groupsView" aria-label="Groepen">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+          </svg>
+          <span>Groepen</span>
+        </button>
+        <button type="button" data-view="todayView" aria-label="Aanwezigheid">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 2v4M16 2v4M3 10h18" />
+            <rect x="3" y="4" width="18" height="18" rx="2" />
+          </svg>
+          <span>Aanwezig</span>
+        </button>
+        <button type="button" data-view="kidsView" data-manager-only aria-label="Kinderen">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01" />
+          </svg>
+          <span>Kinderen</span>
+        </button>
+        <button type="button" data-view="managementView" aria-label="Beheer">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.51a2 2 0 0 1 1-1.72l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+          <span>Beheer</span>
+        </button>
+      </nav>
+    </main>
+
+    <section class="identity-screen" id="identityScreen" aria-label="Kies wie de app gebruikt">
+      <div class="identity-card">
+        <img class="identity-logo" src="./kvw-logo.png" alt="KVW De Noordhoek" />
+        <h2>Welkom in de app!</h2>
+        <p>Kies je naam uit de lijst en log in.</p>
+        <form class="identity-form" id="identityForm">
+          <label for="identitySelect">Gebruiker</label>
+          <select id="identitySelect" aria-label="Kies gebruiker"></select>
+          <button type="submit">Verder</button>
+        </form>
+        <form class="identity-form hidden" id="pinForm">
+          <label for="pinInput" id="pinLabel">PIN code</label>
+          <input id="pinInput" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Pincode van 4-6 cijfers" autocomplete="one-time-code" />
+          <input id="pinConfirmInput" class="hidden" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Herhaal pincode" autocomplete="one-time-code" />
+          <p class="form-error hidden" id="pinError" role="alert"></p>
+          <button type="submit" id="pinSubmitButton">Ontgrendelen</button>
+          <button class="identity-back" id="pinBackButton" type="button">Kies iemand anders</button>
+        </form>
+      </div>
+    </section>
+
+    <div class="save-celebration" id="saveCelebration" aria-hidden="true">
+      <div class="celebration-burst" aria-hidden="true"></div>
+      <div class="celebration-check" aria-label="Opgeslagen">
+        <svg viewBox="0 0 240 240" aria-hidden="true">
+          <circle cx="120" cy="120" r="96" />
+          <path d="M68 124.5 104.5 161 176 82" />
+        </svg>
+      </div>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./supabase-config.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

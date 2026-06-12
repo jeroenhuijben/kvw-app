@@ -1,0 +1,24 @@
+{
+  "rewrites": [
+    {
+      "source": "/styles.css",
+      "destination": "/outputs/styles.css"
+    },
+    {
+      "source": "/app.js",
+      "destination": "/outputs/app.js"
+    },
+    {
+      "source": "/kvw-logo.png",
+      "destination": "/outputs/kvw-logo.png"
+    },
+    {
+      "source": "/supabase-config.js",
+      "destination": "/outputs/supabase-config.js"
+    },
+    {
+      "source": "/",
+      "destination": "/outputs/index.html"
+    }
+  ]
+}

@@ -102,6 +102,7 @@ let remoteSaveTimer = null;
 let lastRemoteUpdate = "";
 let lastSharedStateJson = "";
 let queuedSharedStateJson = "";
+let localSavePending = false;
 
 const scheduleDays = [
   {
@@ -2007,6 +2008,7 @@ function queueRemoteSave() {
   const nextSharedStateJson = sharedStateJson();
   if (nextSharedStateJson === lastSharedStateJson || nextSharedStateJson === queuedSharedStateJson) return;
   queuedSharedStateJson = nextSharedStateJson;
+  localSavePending = true;
   clearTimeout(remoteSaveTimer);
   remoteSaveTimer = setTimeout(saveRemoteState, 350);
 }
@@ -2016,6 +2018,7 @@ async function saveRemoteState() {
   const nextSharedStateJson = sharedStateJson();
   if (nextSharedStateJson === lastSharedStateJson) {
     queuedSharedStateJson = "";
+    localSavePending = false;
     return;
   }
 
@@ -2033,11 +2036,13 @@ async function saveRemoteState() {
   if (error) {
     console.error("Database opslaan mislukt", error);
     showToast("Database opslaan mislukt");
+    localSavePending = false;
     return;
   }
 
   lastSharedStateJson = nextSharedStateJson;
   queuedSharedStateJson = "";
+  localSavePending = false;
 }
 
 async function initDatabase() {
@@ -2085,6 +2090,16 @@ async function initDatabase() {
     .channel("kvw-app-state")
     .on("postgres_changes", { event: "*", schema: "public", table: "kvw_app_state", filter: "id=eq.main" }, (payload) => {
       if (!payload.new?.state || payload.new.updated_at === lastRemoteUpdate) return;
+      const incomingSharedStateJson = JSON.stringify(payload.new.state);
+      if (localSavePending && incomingSharedStateJson !== queuedSharedStateJson) return;
+      if (localSavePending && incomingSharedStateJson === queuedSharedStateJson) {
+        lastRemoteUpdate = payload.new.updated_at || "";
+        lastSharedStateJson = incomingSharedStateJson;
+        queuedSharedStateJson = "";
+        localSavePending = false;
+        return;
+      }
+
       if (shouldKeepLocalState(payload.new.state)) {
         backupLocalState("remote-live-state-smaller-than-local");
         lastSharedStateJson = "";

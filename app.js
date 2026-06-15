@@ -103,6 +103,7 @@ let lastRemoteUpdate = "";
 let lastSharedStateJson = "";
 let queuedSharedStateJson = "";
 let localSavePending = false;
+let lastLocalChangeAt = 0;
 
 const scheduleDays = [
   {
@@ -1965,14 +1966,19 @@ function kidsCount(source) {
   return (source.groups || []).reduce((sum, group) => sum + (group.kids?.length || 0), 0);
 }
 
-function shouldKeepLocalState(remoteState) {
+function shouldRecoverFromEmptyRemoteState(remoteState) {
   const localSharedState = sharedStateSnapshot();
   const localPeople = peopleCount(localSharedState);
   const remotePeople = peopleCount(remoteState || {});
   const localKids = kidsCount(localSharedState);
   const remoteKids = kidsCount(remoteState || {});
 
-  return (localPeople > remotePeople && localPeople >= 3) || (localKids > remoteKids && localKids >= 5);
+  return remotePeople === 0 && remoteKids === 0 && (localPeople > 0 || localKids > 0);
+}
+
+function remoteUpdatedAtMs(value) {
+  const time = Date.parse(value || "");
+  return Number.isNaN(time) ? 0 : time;
 }
 
 function applySharedState(sharedState) {
@@ -2009,6 +2015,7 @@ function queueRemoteSave() {
   if (nextSharedStateJson === lastSharedStateJson || nextSharedStateJson === queuedSharedStateJson) return;
   queuedSharedStateJson = nextSharedStateJson;
   localSavePending = true;
+  lastLocalChangeAt = Date.now();
   clearTimeout(remoteSaveTimer);
   remoteSaveTimer = setTimeout(saveRemoteState, 350);
 }
@@ -2064,7 +2071,7 @@ async function initDatabase() {
   }
 
   if (data?.state) {
-    if (shouldKeepLocalState(data.state)) {
+    if (shouldRecoverFromEmptyRemoteState(data.state)) {
       backupLocalState("remote-state-smaller-than-local");
       databaseReady = true;
       lastSharedStateJson = "";
@@ -2090,6 +2097,8 @@ async function initDatabase() {
     .channel("kvw-app-state")
     .on("postgres_changes", { event: "*", schema: "public", table: "kvw_app_state", filter: "id=eq.main" }, (payload) => {
       if (!payload.new?.state || payload.new.updated_at === lastRemoteUpdate) return;
+      if (remoteUpdatedAtMs(payload.new.updated_at) < lastLocalChangeAt) return;
+
       const incomingSharedStateJson = JSON.stringify(payload.new.state);
       if (localSavePending && incomingSharedStateJson !== queuedSharedStateJson) return;
       if (localSavePending && incomingSharedStateJson === queuedSharedStateJson) {
@@ -2097,13 +2106,6 @@ async function initDatabase() {
         lastSharedStateJson = incomingSharedStateJson;
         queuedSharedStateJson = "";
         localSavePending = false;
-        return;
-      }
-
-      if (shouldKeepLocalState(payload.new.state)) {
-        backupLocalState("remote-live-state-smaller-than-local");
-        lastSharedStateJson = "";
-        saveRemoteState();
         return;
       }
 

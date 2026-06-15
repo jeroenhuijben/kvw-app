@@ -413,6 +413,14 @@
           <select id="identitySelect" aria-label="Kies gebruiker"></select>
           <button type="submit">Verder</button>
         </form>
+        <form class="identity-form hidden" id="bootstrapManagerForm">
+          <label for="bootstrapManagerName">Eerste bestuurslid aanmaken</label>
+          <input id="bootstrapManagerName" type="text" placeholder="Naam bestuurslid" autocomplete="name" />
+          <input id="bootstrapManagerPin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Pincode van 4-6 cijfers" autocomplete="one-time-code" />
+          <input id="bootstrapManagerPinConfirm" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Herhaal pincode" autocomplete="one-time-code" />
+          <p class="form-error hidden" id="bootstrapManagerError" role="alert"></p>
+          <button type="submit">Bestuurslid aanmaken</button>
+        </form>
         <form class="identity-form hidden" id="pinForm">
           <label for="pinInput" id="pinLabel">PIN code</label>
           <input id="pinInput" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Pincode van 4-6 cijfers" autocomplete="one-time-code" />

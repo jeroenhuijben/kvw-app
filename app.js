@@ -4439,6 +4439,11 @@ managerGroups.addEventListener("click", (event) => {
   }
 
   const groupId = deleteGroupButton.dataset.deleteGroup;
+  const groupName = state.groups.find((group) => group.id === groupId)?.name || "deze groep";
+  if (!window.confirm(`Weet je het zeker? Je verwijdert ${groupName}.`)) {
+    return;
+  }
+
   state.groups = state.groups.filter((group) => group.id !== groupId);
   Object.values(state.attendance).forEach((day) => {
     delete day[groupId];

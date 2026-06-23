@@ -1559,7 +1559,7 @@ body.theme-dark .important-info-entry.medium {
   bottom: 0;
   display: flex;
   justify-content: center;
-  gap: 8px;
+  gap: 4px;
   width: min(430px, 100vw);
   min-height: calc(var(--nav-h) + env(safe-area-inset-bottom));
   padding: 9px 12px calc(10px + env(safe-area-inset-bottom));
@@ -1579,14 +1579,15 @@ body.theme-dark .bottom-nav {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  width: 88px;
-  max-width: 25%;
-  min-width: 68px;
+  flex: 1 1 0;
+  width: auto;
+  max-width: 88px;
+  min-width: 0;
   border: 0;
   border-radius: 8px;
   background: transparent;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 850;
 }
 
@@ -1596,8 +1597,8 @@ body.theme-dark .bottom-nav {
 }
 
 .bottom-nav svg {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
 }
 
 .section-title {

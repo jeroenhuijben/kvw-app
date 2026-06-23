@@ -100,7 +100,15 @@
             </svg>
             <span>Evaluatie</span>
           </button>
-          <button class="home-tile contacts-tile" type="button" data-home-target="contactsView">
+          <button class="home-tile time-table-tile" type="button" data-home-target="roomScheduleView">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M8 2v4M16 2v4M3 10h18" />
+              <rect x="3" y="4" width="18" height="18" rx="2" />
+              <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01" />
+            </svg>
+            <span>Tijdschema</span>
+          </button>
+          <button class="home-tile home-info-strip contacts-tile" type="button" data-home-target="contactsView">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <circle cx="12" cy="12" r="10" />
               <path d="M12 8v5M12 17h.01" />
@@ -137,6 +145,15 @@
         </div>
         <div class="category-switch" id="scheduleCategorySwitch" aria-label="Kies categorie"></div>
         <div class="schedule-board" id="scheduleBoard" aria-label="Dagprogramma"></div>
+      </section>
+
+      <section class="content-view hidden" id="roomScheduleView" aria-label="Tijdschema">
+        <div class="section-title">
+          <h2>Tijdschema</h2>
+          <p>Overzicht van ruimtes per dag.</p>
+        </div>
+        <div class="room-schedule-switch" id="roomScheduleSwitch" aria-label="Kies dag"></div>
+        <div class="room-schedule-board" id="roomScheduleBoard" aria-label="Tijdschema ruimtes"></div>
       </section>
 
       <section class="content-view hidden" id="feedbackView" aria-label="Evaluatie">

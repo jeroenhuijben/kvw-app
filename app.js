@@ -2288,6 +2288,8 @@ const ownPinInput = document.querySelector("#ownPinInput");
 const resetPinForm = document.querySelector("#resetPinForm");
 const resetPinUser = document.querySelector("#resetPinUser");
 const resetPinInput = document.querySelector("#resetPinInput");
+const resetAllPinsForm = document.querySelector("#resetAllPinsForm");
+const resetAllPinsConfirm = document.querySelector("#resetAllPinsConfirm");
 const themeToggle = document.querySelector("#themeToggle");
 const scheduleDateLabel = document.querySelector("#scheduleDateLabel");
 const scheduleDayName = document.querySelector("#scheduleDayName");
@@ -2644,7 +2646,7 @@ function hasPin(user) {
 }
 
 function isValidPin(pin) {
-  return /^\d{4,6}$/.test(pin);
+  return /^\d{6,10}$/.test(pin);
 }
 
 function showPinError(message) {
@@ -2820,19 +2822,26 @@ function renderChildList() {
 
 function renderGroups() {
   const attendance = activeAttendance();
-  const groups = visibleGroupsFor();
+  const groups = state.groups;
 
   groupCards.innerHTML = groups
     .map((group) => {
-      const present = group.kids.filter((kid) => attendance[kid] === "present").length;
+      const canOpen = isManager() || (state.currentUser?.role === "leader" && group.leaderIds.includes(state.currentUser.id));
+      const present = canOpen && group.id === state.activeGroupId
+        ? group.kids.filter((kid) => attendance[kid] === "present").length
+        : 0;
       const leaders = group.leaderIds.map(leaderName).join(", ") || "Nog geen leiders";
       return `
-        <button class="group-card ${group.id === state.activeGroupId ? "active" : ""}" type="button" data-group="${group.id}">
+        <button
+          class="group-card ${group.id === state.activeGroupId && canOpen ? "active" : ""} ${canOpen ? "" : "locked"}"
+          type="button"
+          ${canOpen ? `data-group="${group.id}"` : "disabled aria-disabled=\"true\""}
+        >
           <span>
             <strong>${escapeHTML(group.name)}</strong>
             <span>${group.kids.length} kinderen · ${escapeHTML(leaders)}</span>
           </span>
-          <span>${group.id === state.activeGroupId ? `${present} gecheckt` : "Openen"}</span>
+          <span>${canOpen ? (group.id === state.activeGroupId ? `${present} gecheckt` : "Openen") : "Alleen bekijken"}</span>
         </button>
       `;
     })
@@ -3817,7 +3826,7 @@ bootstrapManagerForm.addEventListener("submit", (event) => {
   }
 
   if (!isValidPin(pin)) {
-    showBootstrapManagerError("Gebruik een pincode van 4-6 cijfers.");
+    showBootstrapManagerError("Gebruik een pincode van 6-10 cijfers.");
     return;
   }
 
@@ -3847,8 +3856,8 @@ pinForm.addEventListener("submit", (event) => {
 
   const pin = pinInput.value.trim();
   if (!isValidPin(pin)) {
-    showPinError("Gebruik een pincode van 4-6 cijfers.");
-    showToast("Gebruik een pincode van 4-6 cijfers");
+    showPinError("Gebruik een pincode van 6-10 cijfers.");
+    showToast("Gebruik een pincode van 6-10 cijfers");
     return;
   }
 
@@ -4059,7 +4068,7 @@ changeOwnPinForm.addEventListener("submit", (event) => {
   if (!state.currentUser) return;
 
   if (!isValidPin(pin)) {
-    showToast("Gebruik een pincode van 4-6 cijfers");
+    showToast("Gebruik een pincode van 6-10 cijfers");
     return;
   }
 
@@ -4075,7 +4084,7 @@ resetPinForm.addEventListener("submit", (event) => {
 
   const pin = resetPinInput.value.trim();
   if (!isValidPin(pin)) {
-    showToast("Gebruik een pincode van 4-6 cijfers");
+    showToast("Gebruik een pincode van 6-10 cijfers");
     return;
   }
 
@@ -4083,6 +4092,33 @@ resetPinForm.addEventListener("submit", (event) => {
   resetPinInput.value = "";
   renderAll();
   showToast("Pincode gereset");
+});
+
+resetAllPinsForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (!isManager() || !state.currentUser) return;
+
+  if (resetAllPinsConfirm.value !== "RESET") {
+    showToast("Typ RESET om te bevestigen");
+    return;
+  }
+
+  const ownKey = userKey(state.currentUser);
+  const userKeys = [
+    ...state.managers.map((person) => userKey({ role: "manager", id: person.id })),
+    ...state.leaders.map((person) => userKey({ role: "leader", id: person.id }))
+  ];
+  let resetCount = 0;
+
+  userKeys.forEach((key) => {
+    if (key === ownKey || !state.userPins[key]) return;
+    delete state.userPins[key];
+    resetCount += 1;
+  });
+
+  resetAllPinsConfirm.value = "";
+  renderAll();
+  showToast(`${resetCount} toegangscodes gereset`);
 });
 
 themeToggle.addEventListener("click", (event) => {

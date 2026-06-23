@@ -272,7 +272,7 @@
               <form class="manager-form" id="changeOwnPinForm">
                 <label for="ownPinInput">Mijn pincode wijzigen</label>
                 <div>
-                  <input id="ownPinInput" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Nieuwe pincode" autocomplete="one-time-code" />
+                  <input id="ownPinInput" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="10" placeholder="Nieuwe pincode" autocomplete="one-time-code" />
                   <button type="submit">Bijwerken</button>
                 </div>
               </form>
@@ -287,8 +287,16 @@
                 <label for="resetPinUser">Pincode gebruiker resetten</label>
                 <select id="resetPinUser" aria-label="Kies gebruiker om pincode te resetten"></select>
                 <div>
-                  <input id="resetPinInput" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Nieuwe pincode" autocomplete="one-time-code" />
+                  <input id="resetPinInput" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="10" placeholder="Nieuwe pincode" autocomplete="one-time-code" />
                   <button type="submit">Resetten</button>
+                </div>
+              </form>
+              <form class="admin-only manager-form danger-zone" id="resetAllPinsForm">
+                <label for="resetAllPinsConfirm">Alle toegangscodes resetten</label>
+                <p>Verwijdert de pincodes van alle gebruikers, behalve van jezelf. Zij maken bij de volgende login opnieuw een pincode aan.</p>
+                <div>
+                  <input id="resetAllPinsConfirm" type="text" placeholder="Typ RESET" autocomplete="off" />
+                  <button class="danger-button" type="submit">Alles resetten</button>
                 </div>
               </form>
             </section>
@@ -433,15 +441,15 @@
         <form class="identity-form hidden" id="bootstrapManagerForm">
           <label for="bootstrapManagerName">Eerste bestuurslid aanmaken</label>
           <input id="bootstrapManagerName" type="text" placeholder="Naam bestuurslid" autocomplete="name" />
-          <input id="bootstrapManagerPin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Pincode van 4-6 cijfers" autocomplete="one-time-code" />
-          <input id="bootstrapManagerPinConfirm" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Herhaal pincode" autocomplete="one-time-code" />
+          <input id="bootstrapManagerPin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="10" placeholder="Pincode van 6-10 cijfers" autocomplete="one-time-code" />
+          <input id="bootstrapManagerPinConfirm" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="10" placeholder="Herhaal pincode" autocomplete="one-time-code" />
           <p class="form-error hidden" id="bootstrapManagerError" role="alert"></p>
           <button type="submit">Bestuurslid aanmaken</button>
         </form>
         <form class="identity-form hidden" id="pinForm">
           <label for="pinInput" id="pinLabel">PIN code</label>
-          <input id="pinInput" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Pincode van 4-6 cijfers" autocomplete="one-time-code" />
-          <input id="pinConfirmInput" class="hidden" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Herhaal pincode" autocomplete="one-time-code" />
+          <input id="pinInput" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="10" placeholder="Pincode van 6-10 cijfers" autocomplete="one-time-code" />
+          <input id="pinConfirmInput" class="hidden" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="10" placeholder="Herhaal pincode" autocomplete="one-time-code" />
           <p class="form-error hidden" id="pinError" role="alert"></p>
           <button type="submit" id="pinSubmitButton">Ontgrendelen</button>
           <button class="identity-back" id="pinBackButton" type="button">Kies iemand anders</button>

@@ -1618,11 +1618,24 @@ body.theme-dark .bottom-nav {
   background: var(--surface);
   text-align: left;
   box-shadow: var(--shadow-soft);
+  cursor: pointer;
 }
 
 .group-card.active {
   border-color: var(--blue);
   background: #f3f9fb;
+}
+
+.group-card.locked,
+.group-card:disabled {
+  cursor: default;
+  opacity: 0.72;
+  box-shadow: none;
+}
+
+.group-card.locked strong,
+.group-card.locked span {
+  color: var(--muted);
 }
 
 .group-card strong {
@@ -1781,6 +1794,26 @@ textarea {
 .manager-form {
   display: grid;
   gap: 8px;
+}
+
+.manager-form p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.danger-zone {
+  margin-top: 6px;
+  padding: 12px;
+  border: 1px solid rgba(217, 67, 67, 0.28);
+  border-radius: 8px;
+  background: var(--coral-soft);
+}
+
+body.theme-dark .danger-zone {
+  background: rgba(255, 115, 115, 0.08);
 }
 
 .theme-choice {

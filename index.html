@@ -433,10 +433,15 @@
         <img class="identity-logo" src="./kvw-logo.png" alt="KVW De Noordhoek" />
         <h2>Welkom in de app!</h2>
         <p>Kies je naam uit de lijst en log in.</p>
+        <div class="recent-user-card hidden" id="recentUserCard">
+          <span>Laatst gebruikt</span>
+          <strong id="recentUserName"></strong>
+          <button type="button" id="recentUserButton">Log opnieuw in</button>
+        </div>
         <form class="identity-form" id="identityForm">
-          <label for="identitySelect">Gebruiker</label>
-          <select id="identitySelect" aria-label="Kies gebruiker"></select>
-          <button type="submit">Verder</button>
+          <label for="identitySearch">Gebruiker zoeken</label>
+          <input id="identitySearch" type="search" placeholder="Typ je naam" autocomplete="off" />
+          <div class="identity-results" id="identityResults" aria-label="Gebruikers"></div>
         </form>
         <form class="identity-form hidden" id="bootstrapManagerForm">
           <label for="bootstrapManagerName">Eerste bestuurslid aanmaken</label>

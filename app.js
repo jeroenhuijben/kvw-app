@@ -1,5 +1,6 @@
 const storeKey = "summer-attendance-v1";
 const backupStoreKey = "summer-attendance-backup-before-db";
+const lastUserKey = "summer-attendance-last-user";
 const managerPasswordValue = "summer2026";
 
 const seed = {
@@ -2315,7 +2316,11 @@ const importantInfoText = document.querySelector("#importantInfoText");
 const importantInfoList = document.querySelector("#importantInfoList");
 const identityScreen = document.querySelector("#identityScreen");
 const identityForm = document.querySelector("#identityForm");
-const identitySelect = document.querySelector("#identitySelect");
+const identitySearch = document.querySelector("#identitySearch");
+const identityResults = document.querySelector("#identityResults");
+const recentUserCard = document.querySelector("#recentUserCard");
+const recentUserName = document.querySelector("#recentUserName");
+const recentUserButton = document.querySelector("#recentUserButton");
 const bootstrapManagerForm = document.querySelector("#bootstrapManagerForm");
 const bootstrapManagerName = document.querySelector("#bootstrapManagerName");
 const bootstrapManagerPin = document.querySelector("#bootstrapManagerPin");
@@ -2633,6 +2638,7 @@ function normalizeState(nextState) {
 }
 
 function userExists(nextState, user) {
+  if (!user?.role || !user?.id) return false;
   const source = user.role === "manager" ? nextState.managers : nextState.leaders;
   return source.some((person) => person.id === user.id);
 }
@@ -3551,23 +3557,50 @@ function renderManagementLock() {
 function renderIdentity() {
   const hasUser = Boolean(state.currentUser);
   const hasManagers = state.managers.length > 0;
+  const lastUser = loadLastUser();
+  const query = identitySearch.value.trim().toLowerCase();
+  const users = allLoginUsers();
+  const filteredUsers = users.filter((person) => person.name.toLowerCase().includes(query));
+  const groupedUsers = [
+    { label: "Bestuursleden", people: filteredUsers.filter((person) => person.role === "manager") },
+    { label: "Groepsleiders", people: filteredUsers.filter((person) => person.role === "leader") }
+  ];
+
   identityScreen.classList.toggle("hidden", hasUser);
   identityForm.classList.toggle("hidden", Boolean(pendingUser) || !hasManagers);
   bootstrapManagerForm.classList.toggle("hidden", Boolean(pendingUser) || hasManagers);
   pinForm.classList.toggle("hidden", !pendingUser);
+  recentUserCard.classList.toggle("hidden", Boolean(pendingUser) || !hasManagers || !lastUser);
   currentUserLabel.textContent = hasUser
     ? `${currentUserName()} · ${state.currentUser.role === "manager" ? "Bestuurslid" : "Groepsleider"}`
     : "Kies gebruiker";
 
-  identitySelect.innerHTML = [
-    ...state.managers.map((person) => ({ ...person, role: "manager" })),
-    ...state.leaders.map((person) => ({ ...person, role: "leader" }))
-  ]
-    .map((person) => {
-      const detail = person.role === "manager" ? "Bestuurslid" : "Groepsleider";
-      return `<option value="${person.role}:${person.id}">${escapeHTML(person.name)} (${escapeHTML(detail)})</option>`;
-    })
+  if (lastUser) {
+    recentUserName.textContent = `${userLabel(lastUser)} · ${lastUser.role === "manager" ? "Bestuurslid" : "Groepsleider"}`;
+    recentUserButton.dataset.role = lastUser.role;
+    recentUserButton.dataset.id = lastUser.id;
+  }
+
+  identityResults.innerHTML = groupedUsers
+    .filter((group) => group.people.length)
+    .map((group) => `
+      <section class="identity-result-group">
+        <h3>${escapeHTML(group.label)}</h3>
+        <div>
+          ${group.people.map((person) => `
+            <button type="button" data-login-user="${person.role}:${person.id}">
+              <strong>${escapeHTML(person.name)}</strong>
+              <span>${escapeHTML(person.detail)}</span>
+            </button>
+          `).join("")}
+        </div>
+      </section>
+    `)
     .join("");
+
+  if (!filteredUsers.length) {
+    identityResults.innerHTML = `<p class="identity-empty">Geen gebruiker gevonden.</p>`;
+  }
 
   if (pendingUser) {
     const mode = hasPin(pendingUser) ? "unlock" : "create";
@@ -3585,6 +3618,7 @@ function assignedGroupText(leaderId) {
 
 function chooseUser(role, id) {
   state.currentUser = { role, id };
+  rememberLastUser(state.currentUser);
   managementUnlocked = true;
 
   const visibleGroups = visibleGroupsFor();
@@ -3598,6 +3632,43 @@ function currentPendingUserName() {
   if (!pendingUser) return "";
   const list = pendingUser.role === "manager" ? state.managers : state.leaders;
   return list.find((person) => person.id === pendingUser.id)?.name || "gebruiker";
+}
+
+function allLoginUsers() {
+  return [
+    ...state.managers.map((person) => ({ ...person, role: "manager", detail: "Bestuurslid" })),
+    ...state.leaders.map((person) => ({ ...person, role: "leader", detail: "Groepsleider" }))
+  ];
+}
+
+function userLabel(user) {
+  if (!user) return "";
+  const list = user.role === "manager" ? state.managers : state.leaders;
+  return list.find((person) => person.id === user.id)?.name || "";
+}
+
+function loadLastUser() {
+  try {
+    const user = JSON.parse(localStorage.getItem(lastUserKey) || "null");
+    return userExists(state, user) ? user : null;
+  } catch {
+    return null;
+  }
+}
+
+function rememberLastUser(user) {
+  if (!user) return;
+  localStorage.setItem(lastUserKey, JSON.stringify({ role: user.role, id: user.id }));
+}
+
+function startPinForUser(user) {
+  if (!userExists(state, user)) return;
+  pendingUser = { role: user.role, id: user.id };
+  pinInput.value = "";
+  pinConfirmInput.value = "";
+  clearPinError();
+  renderAll();
+  pinInput.focus();
 }
 
 function showToast(message) {
@@ -3804,14 +3875,23 @@ scheduleBoard.addEventListener("pointerup", (event) => {
 
 identityForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  const [role, id] = identitySelect.value.split(":");
-  if (!role || !id) return;
-  pendingUser = { role, id };
-  pinInput.value = "";
-  pinConfirmInput.value = "";
-  clearPinError();
-  renderAll();
-  pinInput.focus();
+  const users = allLoginUsers().filter((person) => person.name.toLowerCase().includes(identitySearch.value.trim().toLowerCase()));
+  if (users.length === 1) {
+    startPinForUser(users[0]);
+  }
+});
+
+identitySearch.addEventListener("input", renderIdentity);
+
+identityResults.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-login-user]");
+  if (!button) return;
+  const [role, id] = button.dataset.loginUser.split(":");
+  startPinForUser({ role, id });
+});
+
+recentUserButton.addEventListener("click", () => {
+  startPinForUser({ role: recentUserButton.dataset.role, id: recentUserButton.dataset.id });
 });
 
 bootstrapManagerForm.addEventListener("submit", (event) => {

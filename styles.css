@@ -157,6 +157,7 @@ body.theme-dark .identity-screen {
 }
 
 .identity-card {
+  position: relative;
   display: grid;
   justify-items: center;
   gap: 14px;
@@ -187,6 +188,96 @@ body.theme-dark .identity-screen {
   width: 112px;
   height: 112px;
   object-fit: contain;
+}
+
+.install-help-button {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-raised);
+  color: var(--blue);
+  box-shadow: var(--shadow-soft);
+}
+
+.install-help-button svg {
+  width: 24px;
+  height: 24px;
+  stroke-width: 2.2;
+}
+
+.install-help-panel {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid rgba(23, 107, 135, 0.24);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  text-align: left;
+  box-shadow: var(--shadow-soft);
+}
+
+.install-help-panel > div {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.install-help-panel h3,
+.install-help-panel h4 {
+  margin: 0;
+  color: var(--ink);
+}
+
+.install-help-panel h3 {
+  font-size: 17px;
+}
+
+.install-help-panel h4 {
+  font-size: 14px;
+}
+
+.install-help-panel button {
+  min-height: 34px;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--sky);
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.install-help-panel section {
+  display: grid;
+  gap: 6px;
+}
+
+.install-help-panel ol {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.install-help-panel li + li {
+  margin-top: 4px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .install-help-button,
+  .install-help-panel {
+    display: none !important;
+  }
 }
 
 .identity-form {

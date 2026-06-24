@@ -2318,6 +2318,9 @@ const identityScreen = document.querySelector("#identityScreen");
 const identityForm = document.querySelector("#identityForm");
 const identitySearch = document.querySelector("#identitySearch");
 const identityResults = document.querySelector("#identityResults");
+const installHelpButton = document.querySelector("#installHelpButton");
+const installHelpPanel = document.querySelector("#installHelpPanel");
+const installHelpClose = document.querySelector("#installHelpClose");
 const recentUserCard = document.querySelector("#recentUserCard");
 const recentUserName = document.querySelector("#recentUserName");
 const recentUserButton = document.querySelector("#recentUserButton");
@@ -3667,8 +3670,15 @@ function startPinForUser(user) {
   pinInput.value = "";
   pinConfirmInput.value = "";
   clearPinError();
+  installHelpPanel.classList.add("hidden");
   renderAll();
   pinInput.focus();
+}
+
+function toggleInstallHelp(forceOpen) {
+  const shouldOpen = typeof forceOpen === "boolean" ? forceOpen : installHelpPanel.classList.contains("hidden");
+  installHelpPanel.classList.toggle("hidden", !shouldOpen);
+  installHelpButton.setAttribute("aria-expanded", String(shouldOpen));
 }
 
 function showToast(message) {
@@ -3892,6 +3902,14 @@ identityResults.addEventListener("click", (event) => {
 
 recentUserButton.addEventListener("click", () => {
   startPinForUser({ role: recentUserButton.dataset.role, id: recentUserButton.dataset.id });
+});
+
+installHelpButton.addEventListener("click", () => {
+  toggleInstallHelp();
+});
+
+installHelpClose.addEventListener("click", () => {
+  toggleInstallHelp(false);
 });
 
 bootstrapManagerForm.addEventListener("submit", (event) => {

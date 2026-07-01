@@ -64,6 +64,13 @@ const seed = {
   userThemes: {},
   feedback: [],
   importantInfo: [],
+  setupModuleEnabled: false,
+  setupTasks: [
+    { id: "setup-aula", title: "Aula klaarzetten", area: "Odulphus", maxPeople: 2, assignees: [], done: false, checkedBy: "", checkedAt: "" },
+    { id: "setup-borden", title: "Borden en bewegwijzering ophangen", area: "Terrein", maxPeople: 2, assignees: [], done: false, checkedBy: "", checkedAt: "" },
+    { id: "setup-materialen", title: "Materialen per activiteit klaarleggen", area: "Materiaal", maxPeople: 4, assignees: [], done: false, checkedBy: "", checkedAt: "" },
+    { id: "setup-ontvangst", title: "Ontvangsttafel opbouwen", area: "Entree", maxPeople: 1, assignees: [], done: false, checkedBy: "", checkedAt: "" }
+  ],
   days: ["Ma 17 aug", "Di 18 aug", "Wo 19 aug", "Do 20 aug", "Vr 21 aug"],
   attendance: {
     "Ma 17 aug": {
@@ -2314,6 +2321,13 @@ const importantInfoUrgency = document.querySelector("#importantInfoUrgency");
 const importantInfoTitle = document.querySelector("#importantInfoTitle");
 const importantInfoText = document.querySelector("#importantInfoText");
 const importantInfoList = document.querySelector("#importantInfoList");
+const setupHomeTile = document.querySelector("#setupHomeTile");
+const setupSummary = document.querySelector("#setupSummary");
+const setupTaskList = document.querySelector("#setupTaskList");
+const setupModuleToggle = document.querySelector("#setupModuleToggle");
+const setupTaskForm = document.querySelector("#setupTaskForm");
+const setupTaskTitle = document.querySelector("#setupTaskTitle");
+const setupTaskArea = document.querySelector("#setupTaskArea");
 const identityScreen = document.querySelector("#identityScreen");
 const identityForm = document.querySelector("#identityForm");
 const identitySearch = document.querySelector("#identitySearch");
@@ -2378,6 +2392,8 @@ function sharedStateSnapshot() {
     userThemes: state.userThemes,
     feedback: state.feedback,
     importantInfo: state.importantInfo,
+    setupModuleEnabled: state.setupModuleEnabled,
+    setupTasks: state.setupTasks,
     days: state.days,
     attendance: state.attendance,
     savedAt: state.savedAt
@@ -2421,9 +2437,12 @@ function applySharedState(sharedState) {
 
   state = normalizeState({ ...structuredClone(seed), ...sharedState });
   state.currentUser = session.currentUser && userExists(state, session.currentUser) ? session.currentUser : null;
-  state.activeView = ["homeView", "todayView", "scheduleView", "roomScheduleView", "feedbackView", "contactsView", "groupsView", "kidsView", "managementView"].includes(session.activeView)
+  state.activeView = ["homeView", "todayView", "scheduleView", "setupView", "roomScheduleView", "feedbackView", "contactsView", "groupsView", "kidsView", "managementView"].includes(session.activeView)
     ? session.activeView
     : "homeView";
+  if (!state.setupModuleEnabled && state.activeView === "setupView") {
+    state.activeView = "homeView";
+  }
   state.activeDay = state.days.includes(session.activeDay) ? session.activeDay : state.days[0];
 
   const visibleGroups = visibleGroupsFor(state);
@@ -2597,6 +2616,8 @@ function normalizeState(nextState) {
   nextState.userThemes ||= {};
   nextState.feedback = Array.isArray(nextState.feedback) ? nextState.feedback : [];
   nextState.importantInfo = Array.isArray(nextState.importantInfo) ? nextState.importantInfo : [];
+  nextState.setupModuleEnabled = Boolean(nextState.setupModuleEnabled);
+  nextState.setupTasks = Array.isArray(nextState.setupTasks) ? nextState.setupTasks : structuredClone(seed.setupTasks);
   nextState.currentUser = null;
 
   nextState.leaders = nextState.leaders.map((leader) => ({
@@ -2620,7 +2641,33 @@ function normalizeState(nextState) {
     nextState.activeDay = nextState.days[0];
   }
 
-  if (!["homeView", "todayView", "scheduleView", "roomScheduleView", "feedbackView", "contactsView", "groupsView", "kidsView", "managementView"].includes(nextState.activeView)) {
+  nextState.setupTasks = nextState.setupTasks.map((task) => {
+    const assignees = Array.isArray(task.assignees)
+      ? task.assignees.filter((person) => person?.userKey && person?.name)
+      : [];
+    if (!assignees.length && task.assigneeKey && task.assigneeName) {
+      assignees.push({ userKey: task.assigneeKey, name: task.assigneeName });
+    }
+
+    const maxPeople = Math.max(1, Number(task.maxPeople) || assignees.length || 1);
+
+    return {
+      id: task.id || `setup-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      title: task.title || "Naamloze taak",
+      area: task.area || "Algemeen",
+      maxPeople: Math.max(maxPeople, assignees.length),
+      assignees,
+      done: Boolean(task.done),
+      checkedBy: task.checkedBy || "",
+      checkedAt: task.checkedAt || ""
+    };
+  });
+
+  if (!["homeView", "todayView", "scheduleView", "setupView", "roomScheduleView", "feedbackView", "contactsView", "groupsView", "kidsView", "managementView"].includes(nextState.activeView)) {
+    nextState.activeView = "homeView";
+  }
+
+  if (!nextState.setupModuleEnabled && nextState.activeView === "setupView") {
     nextState.activeView = "homeView";
   }
 
@@ -3071,6 +3118,89 @@ function renderImportantInfo() {
   }
 }
 
+function setupProgress() {
+  const total = state.setupTasks.reduce((sum, task) => sum + task.maxPeople, 0);
+  const claimed = state.setupTasks.reduce((sum, task) => sum + (task.done ? 0 : task.assignees.length), 0);
+  const done = state.setupTasks.filter((task) => task.done).length;
+  const open = state.setupTasks.reduce((sum, task) => sum + (task.done ? 0 : Math.max(0, task.maxPeople - task.assignees.length)), 0);
+  return { total, claimed, done, open };
+}
+
+function setupTaskStatus(task) {
+  if (task.done) return { className: "done", label: "Gecontroleerd" };
+  if (task.assignees.length >= task.maxPeople) return { className: "claimed", label: "Vol" };
+  if (task.assignees.length) return { className: "claimed", label: "In uitvoering" };
+  return { className: "open", label: "Open" };
+}
+
+function renderSetupModule() {
+  setupHomeTile.classList.toggle("hidden", !state.setupModuleEnabled);
+
+  if (!state.setupModuleEnabled && state.activeView === "setupView") {
+    state.activeView = "homeView";
+  }
+
+  const progress = setupProgress();
+  setupSummary.innerHTML = `
+    <article><strong>${progress.open}</strong><span>plekken open</span></article>
+    <article><strong>${progress.claimed}</strong><span>bezet</span></article>
+    <article><strong>${progress.done}</strong><span>klaar</span></article>
+  `;
+
+  setupTaskList.innerHTML = state.setupTasks
+    .map((task) => {
+      const status = setupTaskStatus(task);
+      const currentKey = userKey(state.currentUser);
+      const assignedToCurrentUser = task.assignees.some((person) => person.userKey === currentKey);
+      const availableSpots = Math.max(0, task.maxPeople - task.assignees.length);
+      const assigneeNames = task.assignees.map((person) => person.name).join(", ");
+      const canClaim = !task.done && !assignedToCurrentUser && availableSpots > 0;
+      const canRelease = !task.done && assignedToCurrentUser;
+      return `
+        <article class="setup-task ${status.className}">
+          <div class="setup-task-main">
+            <span class="setup-status ${status.className}">${status.label}</span>
+            <strong>${escapeHTML(task.title)}</strong>
+            <span>${escapeHTML(task.area)} · ${task.assignees.length}/${task.maxPeople} plekken bezet</span>
+            ${assigneeNames ? `<small>Opgepakt door ${escapeHTML(assigneeNames)}</small>` : `<small>Nog niemand gekoppeld</small>`}
+            ${task.done ? `<small>Afgevinkt door ${escapeHTML(task.checkedBy)}${task.checkedAt ? ` · ${escapeHTML(task.checkedAt)}` : ""}</small>` : ""}
+          </div>
+          <div class="setup-task-actions">
+            ${canClaim ? `<button type="button" data-claim-setup="${task.id}">Ik pak dit op</button>` : ""}
+            ${canRelease ? `<button class="text-button" type="button" data-release-setup="${task.id}">Vrijgeven</button>` : ""}
+            ${isManager() && !task.done ? `
+              <button class="setup-icon-button check" type="button" data-check-setup="${task.id}" aria-label="Controleer ${escapeAttribute(task.title)}">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 13 4 4L19 7" /></svg>
+              </button>
+            ` : ""}
+            ${isManager() && task.done ? `<button class="text-button" type="button" data-reopen-setup="${task.id}">Heropenen</button>` : ""}
+            ${isManager() ? `
+              <div class="setup-capacity-control" aria-label="Aantal personen voor ${escapeAttribute(task.title)}">
+                <button type="button" data-decrease-setup-capacity="${task.id}" aria-label="Minder personen">-</button>
+                <strong>${task.maxPeople}</strong>
+                <button type="button" data-increase-setup-capacity="${task.id}" aria-label="Meer personen">+</button>
+              </div>
+              <button class="setup-icon-button delete" type="button" data-remove-setup-task="${task.id}" aria-label="Verwijder ${escapeAttribute(task.title)}">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 16h10l1-16M10 11v6M14 11v6" /></svg>
+              </button>
+            ` : ""}
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+
+  if (!state.setupTasks.length) {
+    setupTaskList.innerHTML = `<article class="setup-task"><div class="setup-task-main"><strong>Nog geen taken</strong><span>Een bestuurslid kan taken toevoegen in Beheer.</span></div></article>`;
+  }
+}
+
+function renderSetupManagement() {
+  setupModuleToggle.textContent = state.setupModuleEnabled ? "Aan" : "Uit";
+  setupModuleToggle.classList.toggle("active", state.setupModuleEnabled);
+  setupModuleToggle.setAttribute("aria-pressed", String(state.setupModuleEnabled));
+}
+
 function urgencyLabel(urgency) {
   const labels = {
     low: "Laag",
@@ -3491,6 +3621,10 @@ function roleFromCsv(value) {
 }
 
 function renderView() {
+  if (!state.setupModuleEnabled && state.activeView === "setupView") {
+    state.activeView = "homeView";
+  }
+
   if (!isManager() && state.activeView === "kidsView") {
     state.activeView = "homeView";
   }
@@ -3523,6 +3657,8 @@ function renderAll() {
   renderManagement();
   renderFeedback();
   renderImportantInfo();
+  renderSetupModule();
+  renderSetupManagement();
   renderSchedule();
   renderRoomSchedule();
   renderView();
@@ -3537,6 +3673,11 @@ function setAttendance(kid, status) {
 }
 
 function openView(viewId) {
+  if (viewId === "setupView" && !state.setupModuleEnabled) {
+    showToast("Opbouwmodule staat uit");
+    viewId = "homeView";
+  }
+
   if (viewId === "kidsView" && !isManager()) {
     showToast("Alleen voor bestuursleden");
     viewId = "homeView";
@@ -4226,6 +4367,132 @@ themeToggle.addEventListener("click", (event) => {
   state.userThemes[userKey(state.currentUser)] = button.dataset.themeOption === "dark" ? "dark" : "light";
   renderAll();
   showToast(button.dataset.themeOption === "dark" ? "Donker thema ingesteld" : "Licht thema ingesteld");
+});
+
+setupModuleToggle.addEventListener("click", () => {
+  if (!isManager()) return;
+  state.setupModuleEnabled = !state.setupModuleEnabled;
+  if (!state.setupModuleEnabled && state.activeView === "setupView") {
+    state.activeView = "homeView";
+  }
+  renderAll();
+  showToast(state.setupModuleEnabled ? "Opbouwmodule aangezet" : "Opbouwmodule uitgezet");
+});
+
+setupTaskForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (!isManager()) return;
+
+  const title = setupTaskTitle.value.trim().replace(/\s+/g, " ");
+  const area = setupTaskArea.value.trim().replace(/\s+/g, " ") || "Algemeen";
+  if (!title) {
+    showToast("Vul een taak in");
+    return;
+  }
+
+  state.setupTasks.push({
+    id: `setup-${Date.now()}`,
+    title,
+    area,
+    maxPeople: 1,
+    assignees: [],
+    done: false,
+    checkedBy: "",
+    checkedAt: ""
+  });
+  setupTaskTitle.value = "";
+  setupTaskArea.value = "";
+  renderAll();
+  showToast("Opbouwtaak toegevoegd");
+});
+
+setupTaskList.addEventListener("click", (event) => {
+  const claimButton = event.target.closest("[data-claim-setup]");
+  const releaseButton = event.target.closest("[data-release-setup]");
+  const checkButton = event.target.closest("[data-check-setup]");
+  const reopenButton = event.target.closest("[data-reopen-setup]");
+  const removeButton = event.target.closest("[data-remove-setup-task]");
+  const decreaseButton = event.target.closest("[data-decrease-setup-capacity]");
+  const increaseButton = event.target.closest("[data-increase-setup-capacity]");
+  const button = claimButton || releaseButton || checkButton || reopenButton || removeButton || decreaseButton || increaseButton;
+  if (!button || !state.currentUser) return;
+
+  const taskId = button.dataset.claimSetup
+    || button.dataset.releaseSetup
+    || button.dataset.checkSetup
+    || button.dataset.reopenSetup
+    || button.dataset.removeSetupTask
+    || button.dataset.decreaseSetupCapacity
+    || button.dataset.increaseSetupCapacity;
+  const task = state.setupTasks.find((item) => item.id === taskId);
+  if (!task) return;
+
+  if (removeButton || decreaseButton || increaseButton) {
+    if (!isManager()) return;
+
+    if (removeButton) {
+      state.setupTasks = state.setupTasks.filter((item) => item.id !== removeButton.dataset.removeSetupTask);
+      renderAll();
+      showToast("Opbouwtaak verwijderd");
+      return;
+    }
+
+    if (increaseButton) {
+      task.maxPeople += 1;
+      showToast("Aantal personen verhoogd");
+    }
+
+    if (decreaseButton) {
+      if (task.maxPeople <= Math.max(1, task.assignees.length)) {
+        showToast("Kan niet lager dan het aantal gekoppelde personen");
+        return;
+      }
+      task.maxPeople -= 1;
+      showToast("Aantal personen verlaagd");
+    }
+
+    renderAll();
+    return;
+  }
+
+  if (claimButton && !task.done && task.assignees.length < task.maxPeople) {
+    const currentKey = userKey(state.currentUser);
+    if (!task.assignees.some((person) => person.userKey === currentKey)) {
+      task.assignees.push({ userKey: currentKey, name: currentUserName() });
+    }
+    showToast("Taak opgepakt");
+  }
+
+  if (releaseButton && !task.done) {
+    task.assignees = task.assignees.filter((person) => person.userKey !== userKey(state.currentUser));
+    showToast("Taak vrijgegeven");
+  }
+
+  if (checkButton) {
+    if (!isManager()) {
+      showToast("Alleen bestuursleden kunnen afvinken");
+      return;
+    }
+    task.done = true;
+    task.checkedBy = currentUserName();
+    task.checkedAt = new Intl.DateTimeFormat("nl-NL", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit"
+    }).format(new Date());
+    showToast("Taak gecontroleerd");
+  }
+
+  if (reopenButton) {
+    if (!isManager()) return;
+    task.done = false;
+    task.checkedBy = "";
+    task.checkedAt = "";
+    showToast("Taak heropend");
+  }
+
+  renderAll();
 });
 
 feedbackForm.addEventListener("submit", (event) => {

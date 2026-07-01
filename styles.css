@@ -818,6 +818,10 @@ body.theme-dark .critical-banner {
   color: var(--blue);
 }
 
+.setup-tile svg {
+  color: var(--green);
+}
+
 .home-info-strip {
   grid-column: 1 / -1;
   display: grid;
@@ -1393,6 +1397,143 @@ body.theme-dark .room-timetable-event.kids {
 .important-info-list {
   display: grid;
   gap: 10px;
+}
+
+.setup-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 0 16px 12px;
+}
+
+.setup-summary article {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+  text-align: center;
+}
+
+.setup-summary strong {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.setup-summary span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.setup-task-list {
+  display: grid;
+  gap: 10px;
+  padding: 0 16px calc(var(--nav-h) + 28px);
+}
+
+.setup-task {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-left: 6px solid var(--blue);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.setup-task.claimed {
+  border-left-color: var(--amber);
+}
+
+.setup-task.done {
+  border-left-color: var(--green);
+}
+
+.setup-task-main {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.setup-task-main strong {
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.setup-task-main span,
+.setup-task-main small {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.setup-status {
+  display: inline-grid;
+  justify-self: start;
+  min-height: 24px;
+  place-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--sky);
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.setup-status.claimed {
+  background: #fff7e8;
+  color: var(--amber);
+}
+
+.setup-status.done {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.setup-task-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.setup-task-actions button,
+.setup-admin-toggle button {
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--blue);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.setup-task-actions .setup-icon-button {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  min-width: 38px;
+  padding: 0;
+}
+
+.setup-icon-button svg {
+  width: 21px;
+  height: 21px;
+  stroke-width: 2.2;
+}
+
+.setup-icon-button.check {
+  background: var(--green);
+}
+
+.setup-icon-button.delete {
+  background: var(--coral);
 }
 
 .confirm-panel {
@@ -1988,6 +2129,106 @@ textarea {
 .manager-form {
   display: grid;
   gap: 8px;
+}
+
+.setup-admin-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-raised);
+}
+
+.setup-admin-toggle span {
+  display: grid;
+  gap: 2px;
+}
+
+.setup-admin-toggle strong {
+  font-size: 15px;
+}
+
+.setup-admin-toggle small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.setup-admin-toggle button {
+  min-width: 72px;
+  background: var(--muted);
+}
+
+.setup-admin-toggle button.active {
+  background: var(--green);
+}
+
+.setup-task-form {
+  display: grid;
+  gap: 8px;
+  margin: 0 16px 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.setup-task-form label {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.setup-task-form input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  outline: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 750;
+}
+
+.setup-task-form div {
+  display: grid;
+  grid-template-columns: 1fr 96px;
+  gap: 8px;
+}
+
+.setup-task-form button {
+  min-height: 48px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--blue);
+  color: #fff;
+  font-weight: 900;
+}
+
+.setup-capacity-control {
+  display: grid;
+  grid-template-columns: 34px 34px 34px;
+  align-items: center;
+  justify-items: center;
+  gap: 4px;
+}
+
+.setup-capacity-control button {
+  width: 34px;
+  min-height: 34px;
+  padding: 0;
+  background: var(--sky);
+  color: var(--blue);
+  font-size: 18px;
+}
+
+.setup-capacity-control strong {
+  font-size: 15px;
 }
 
 .manager-form p {

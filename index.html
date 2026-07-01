@@ -108,6 +108,12 @@
             </svg>
             <span>Tijdschema</span>
           </button>
+          <button class="home-tile home-info-strip setup-tile hidden" id="setupHomeTile" type="button" data-home-target="setupView">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.1-3.1a6 6 0 0 1-7.8 7.8L6.5 20.5a2.1 2.1 0 0 1-3-3L10 11a6 6 0 0 1 7.8-7.8Z" />
+            </svg>
+            <span>Opbouw</span>
+          </button>
           <button class="home-tile home-info-strip contacts-tile" type="button" data-home-target="contactsView">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <circle cx="12" cy="12" r="10" />
@@ -145,6 +151,24 @@
         </div>
         <div class="category-switch" id="scheduleCategorySwitch" aria-label="Kies categorie"></div>
         <div class="schedule-board" id="scheduleBoard" aria-label="Dagprogramma"></div>
+      </section>
+
+      <section class="content-view hidden" id="setupView" aria-label="Opbouw">
+        <div class="section-title">
+          <h2>Opbouw zondag 16 augustus</h2>
+          <p>Pak een taak op, zodat iedereen ziet wat nog open staat. Een bestuurslid vinkt gecontroleerde taken af.</p>
+        </div>
+        <form class="admin-only setup-task-form" id="setupTaskForm">
+          <label for="setupTaskTitle">Nieuwe taak</label>
+          <input id="setupTaskTitle" type="text" placeholder="Bijvoorbeeld: tenten klaarzetten" autocomplete="off" />
+          <label for="setupTaskArea">Locatie of onderdeel</label>
+          <div>
+            <input id="setupTaskArea" type="text" placeholder="Bijvoorbeeld: plein" autocomplete="off" />
+            <button type="submit">Toevoegen</button>
+          </div>
+        </form>
+        <div class="setup-summary" id="setupSummary"></div>
+        <div class="setup-task-list" id="setupTaskList"></div>
       </section>
 
       <section class="content-view hidden" id="roomScheduleView" aria-label="Tijdschema">
@@ -358,6 +382,20 @@
                 </form>
               </div>
               <p class="bulk-import-status" id="bulkImportStatus"></p>
+            </section>
+
+            <section class="admin-only manager-section">
+              <div class="manager-section-header">
+                <h3>Opbouw zondag</h3>
+                <p>Zet de opbouwmodule aan of uit. Taken beheren doe je in de Opbouw module zelf.</p>
+              </div>
+              <div class="setup-admin-toggle">
+                <span>
+                  <strong>Module zichtbaar</strong>
+                  <small>Alleen relevant voor zondag 16 augustus.</small>
+                </span>
+                <button type="button" id="setupModuleToggle" aria-pressed="false">Uit</button>
+              </div>
             </section>
 
             <section class="admin-only manager-section">

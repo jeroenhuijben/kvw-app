@@ -2064,6 +2064,78 @@ textarea {
   padding: 0 16px 24px;
 }
 
+.management-hub {
+  display: grid;
+  gap: 10px;
+}
+
+.management-tile {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  align-items: center;
+  gap: 12px;
+  min-height: 76px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+  box-shadow: var(--shadow-soft);
+}
+
+.management-tile svg {
+  width: 30px;
+  height: 30px;
+  padding: 6px;
+  border-radius: 8px;
+  background: var(--sky);
+  color: var(--blue);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.management-tile span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.management-tile strong {
+  font-size: 17px;
+  line-height: 1.15;
+}
+
+.management-tile small {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+.management-tile:active {
+  transform: translateY(1px);
+}
+
+.management-panel-hidden {
+  display: none !important;
+}
+
+.management-back {
+  justify-self: start;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--sky);
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 900;
+}
+
 .manager-section,
 .manager-group-card {
   border: 1px solid var(--line);
@@ -2833,6 +2905,19 @@ textarea {
     max-width: 1040px;
     margin: 0 auto;
     padding: 0 28px 150px;
+  }
+
+  .management-hub {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .management-tile {
+    min-height: 96px;
+    padding: 18px;
+  }
+
+  .management-tile strong {
+    font-size: 19px;
   }
 
   .manager-user-grid {

@@ -2291,6 +2291,8 @@ const unlockForm = document.querySelector("#unlockForm");
 const managerPassword = document.querySelector("#managerPassword");
 const lockManagementButton = document.querySelector("#lockManagementButton");
 const managementIntro = document.querySelector("#managementIntro");
+const managementHub = document.querySelector("#managementHub");
+const managementPanels = document.querySelectorAll("[data-management-panel]");
 const changeOwnPinForm = document.querySelector("#changeOwnPinForm");
 const ownPinInput = document.querySelector("#ownPinInput");
 const resetPinForm = document.querySelector("#resetPinForm");
@@ -2354,6 +2356,7 @@ const currentUserLabel = document.querySelector("#currentUserLabel");
 const switchUserButton = document.querySelector("#switchUserButton");
 let managementUnlocked = false;
 let pendingUser = null;
+let activeManagementPanel = "";
 
 function loadState() {
   const stored = localStorage.getItem(storeKey);
@@ -2953,6 +2956,18 @@ function renderSaveStatus() {
   saveButton.setAttribute("aria-disabled", String(!hasUnsavedCheck()));
 }
 
+function renderManagementPanels() {
+  if (!isManager() && activeManagementPanel && activeManagementPanel !== "access") {
+    activeManagementPanel = "access";
+  }
+
+  const hasOpenPanel = Boolean(activeManagementPanel);
+  managementHub.classList.toggle("hidden", hasOpenPanel);
+  managementPanels.forEach((panel) => {
+    panel.classList.toggle("management-panel-hidden", panel.dataset.managementPanel !== activeManagementPanel);
+  });
+}
+
 function renderManagement() {
   const kidCount = state.groups.reduce((sum, group) => sum + group.kids.length, 0);
   managementIntro.textContent = isManager()
@@ -3057,6 +3072,8 @@ function renderManagement() {
       </article>
     `)
     .join("");
+
+  renderManagementPanels();
 }
 
 function renderFeedback() {
@@ -3764,6 +3781,7 @@ function chooseUser(role, id) {
   state.currentUser = { role, id };
   rememberLastUser(state.currentUser);
   managementUnlocked = true;
+  activeManagementPanel = "";
 
   const visibleGroups = visibleGroupsFor();
   state.activeGroupId = visibleGroups[0]?.id || state.groups[0].id;
@@ -4142,6 +4160,7 @@ pinBackButton.addEventListener("click", () => {
 switchUserButton.addEventListener("click", () => {
   state.currentUser = null;
   managementUnlocked = false;
+  activeManagementPanel = "";
   pendingUser = null;
   clearPinError();
   renderAll();
@@ -4377,6 +4396,20 @@ setupModuleToggle.addEventListener("click", () => {
   }
   renderAll();
   showToast(state.setupModuleEnabled ? "Opbouwmodule aangezet" : "Opbouwmodule uitgezet");
+});
+
+managementWorkspace.addEventListener("click", (event) => {
+  const tile = event.target.closest("[data-management-target]");
+  if (tile) {
+    activeManagementPanel = tile.dataset.managementTarget;
+    renderAll();
+    return;
+  }
+
+  const backButton = event.target.closest("[data-management-back]");
+  if (!backButton) return;
+  activeManagementPanel = "";
+  renderAll();
 });
 
 setupTaskForm.addEventListener("submit", (event) => {
@@ -4750,6 +4783,7 @@ unlockForm.addEventListener("submit", (event) => {
 
   if (managerPassword.value === managerPasswordValue) {
     managementUnlocked = true;
+    activeManagementPanel = "";
     managerPassword.value = "";
     renderAll();
     showToast("Beheer ontgrendeld");
@@ -4764,6 +4798,7 @@ lockManagementButton.addEventListener("click", () => {
   state.currentUser = null;
   pendingUser = null;
   managementUnlocked = false;
+  activeManagementPanel = "";
   renderAll();
   showToast("Vergrendeld");
 });

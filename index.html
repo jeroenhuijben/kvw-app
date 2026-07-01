@@ -288,7 +288,35 @@
             <button class="text-button" id="lockManagementButton" type="button">Vergrendelen</button>
           </div>
           <div class="manager-layout">
-            <section class="manager-section">
+            <div class="management-hub" id="managementHub" aria-label="Beheer onderdelen">
+              <button class="management-tile" type="button" data-management-target="access">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3" /><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M12 15v2" /></svg>
+                <span><strong>Toegang</strong><small>Pincode en thema</small></span>
+              </button>
+              <button class="admin-only management-tile" type="button" data-management-target="overview">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5" /><path d="M8 17V9" /><path d="M13 17V7" /><path d="M18 17v-5" /><path d="M3 19h18" /></svg>
+                <span><strong>Overzicht</strong><small>Tellingen en status</small></span>
+              </button>
+              <button class="admin-only management-tile" type="button" data-management-target="users">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+                <span><strong>Gebruikers</strong><small>Leiders en bestuursleden</small></span>
+              </button>
+              <button class="admin-only management-tile" type="button" data-management-target="import">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" /></svg>
+                <span><strong>Bulk import</strong><small>CSV voor kinderen en gebruikers</small></span>
+              </button>
+              <button class="admin-only management-tile" type="button" data-management-target="setup">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.1-3.1a6 6 0 0 1-7.9 7.9l-6 6a2 2 0 0 1-2.8-2.8l6-6a6 6 0 0 1 7.9-7.9l-3.3 2.9Z" /></svg>
+                <span><strong>Opbouw zondag</strong><small>Module aan of uit</small></span>
+              </button>
+              <button class="admin-only management-tile" type="button" data-management-target="groups">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18" /><path d="M3 12h18" /><path d="M3 17h18" /><path d="M7 4v16" /></svg>
+                <span><strong>Groepen en kinderen</strong><small>Indeling en koppelingen</small></span>
+              </button>
+            </div>
+
+            <section class="manager-section management-panel management-panel-hidden" data-management-panel="access">
+              <button class="management-back" type="button" data-management-back>Terug naar beheer</button>
               <div class="manager-section-header">
                 <h3>Toegang</h3>
                 <p>Pincodes voor jezelf en als bestuurslid ook voor anderen.</p>
@@ -325,7 +353,8 @@
               </form>
             </section>
 
-            <section class="admin-only manager-section">
+            <section class="admin-only manager-section management-panel management-panel-hidden" data-management-panel="overview">
+              <button class="management-back" type="button" data-management-back>Terug naar beheer</button>
               <div class="manager-section-header">
                 <h3>Overzicht</h3>
                 <p>Snelle telling van groepen, kinderen en gebruikers.</p>
@@ -333,7 +362,8 @@
               <div class="manager-stats" id="managerStats"></div>
             </section>
 
-            <section class="admin-only manager-section">
+            <section class="admin-only manager-section management-panel management-panel-hidden" data-management-panel="users">
+              <button class="management-back" type="button" data-management-back>Terug naar beheer</button>
               <div class="manager-section-header">
                 <h3>Gebruikers</h3>
                 <p>Voeg groepsleiders en bestuursleden toe. Daarna kun je leiders aan groepen koppelen.</p>
@@ -362,7 +392,8 @@
               </div>
             </section>
 
-            <section class="admin-only manager-section">
+            <section class="admin-only manager-section management-panel management-panel-hidden" data-management-panel="import">
+              <button class="management-back" type="button" data-management-back>Terug naar beheer</button>
               <div class="manager-section-header">
                 <h3>Bulk import</h3>
                 <p>Upload meerdere kinderen of gebruikers tegelijk vanuit een CSV-bestand.</p>
@@ -384,7 +415,8 @@
               <p class="bulk-import-status" id="bulkImportStatus"></p>
             </section>
 
-            <section class="admin-only manager-section">
+            <section class="admin-only manager-section management-panel management-panel-hidden" data-management-panel="setup">
+              <button class="management-back" type="button" data-management-back>Terug naar beheer</button>
               <div class="manager-section-header">
                 <h3>Opbouw zondag</h3>
                 <p>Zet de opbouwmodule aan of uit. Taken beheren doe je in de Opbouw module zelf.</p>
@@ -398,7 +430,8 @@
               </div>
             </section>
 
-            <section class="admin-only manager-section">
+            <section class="admin-only manager-section management-panel management-panel-hidden" data-management-panel="groups">
+              <button class="management-back" type="button" data-management-back>Terug naar beheer</button>
               <div class="manager-section-header">
                 <h3>Groepen en kinderen</h3>
                 <p>Maak groepen, koppel leiders en beheer kinderen per groep.</p>

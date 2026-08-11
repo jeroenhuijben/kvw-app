@@ -5,18 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#f7f9fc" />
     <title>KVW app</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=20260812-support-profiles" />
   </head>
   <body>
     <main class="phone-shell" aria-label="App voor ochtendaanwezigheid">
       <header class="topbar">
         <img class="header-logo" src="./kvw-logo.png" alt="KVW De Noordhoek" />
         <h1>KVW app</h1>
-        <button class="icon-button" id="menuButton" type="button" aria-label="Menu openen">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M4 7h16M4 12h16M4 17h16" />
-          </svg>
-        </button>
+        <div class="topbar-actions">
+          <button class="icon-button admin-only hidden" id="boardGuideButton" type="button" aria-label="Draaiboek bestuur openen" title="Draaiboek bestuur">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 2h9l4 4v16H6z" />
+              <path d="M14 2v5h5M9 12h6M9 16h6" />
+            </svg>
+          </button>
+          <button class="icon-button" id="menuButton" type="button" aria-label="Menu openen">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            </svg>
+          </button>
+        </div>
       </header>
 
       <div class="user-strip" id="userStrip">
@@ -81,6 +89,21 @@
           <strong id="criticalInfoBannerText"></strong>
         </button>
         <div class="home-dashboard">
+          <button class="home-tile home-info-half home-highlight-tile contacts-tile" type="button" data-home-target="contactsView">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 8v5M12 17h.01" />
+            </svg>
+            <span>Belangrijke info</span>
+          </button>
+          <button class="home-tile home-info-half home-highlight-tile agreements-tile" type="button" data-home-target="agreementsView">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M9 5h6M9 3h6v4H9z" />
+              <path d="M7 5H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+              <path d="m8 13 2 2 5-5M8 19h8" />
+            </svg>
+            <span>Algemene afspraken</span>
+          </button>
           <button class="home-tile schedule-tile" type="button" data-home-target="scheduleView">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M8 2v4M16 2v4M3 10h18" />
@@ -114,12 +137,13 @@
             </svg>
             <span>Opbouw</span>
           </button>
-          <button class="home-tile home-info-strip contacts-tile" type="button" data-home-target="contactsView">
+          <button class="home-tile home-info-strip board-tile" type="button" data-home-target="boardView">
             <svg viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 8v5M12 17h.01" />
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
             </svg>
-            <span>Belangrijke info</span>
+            <span>Bestuur &amp; ondersteuning</span>
           </button>
         </div>
       </section>
@@ -133,9 +157,18 @@
       </section>
 
       <section class="content-view hidden" id="scheduleView" aria-label="Programma">
-        <div class="section-title">
-          <h2>Programma</h2>
-          <p id="scheduleDateLabel">Maandag 17 augustus</p>
+        <div class="section-title section-title-with-action">
+          <div>
+            <h2>Programma</h2>
+            <p id="scheduleDateLabel">Maandag 17 augustus</p>
+          </div>
+          <button class="instruction-library-open" id="openInstructionLibraryButton" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M2 5.5A2.5 2.5 0 0 1 4.5 3H11v16H4.5A2.5 2.5 0 0 0 2 21.5Z" />
+              <path d="M22 5.5A2.5 2.5 0 0 0 19.5 3H13v16h6.5a2.5 2.5 0 0 1 2.5 2.5Z" />
+            </svg>
+            <span>Bibliotheek</span>
+          </button>
         </div>
         <div class="schedule-toolbar">
           <button class="icon-button schedule-day-button" id="prevScheduleDay" type="button" aria-label="Vorige dag">
@@ -150,7 +183,44 @@
           </button>
         </div>
         <div class="category-switch" id="scheduleCategorySwitch" aria-label="Kies categorie"></div>
+        <section class="toverland-hub hidden" id="toverlandHub" aria-label="Toverland info">
+          <header>
+            <span class="toverland-hub-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 6.5 9 4l6 2.5L20 4v13.5L15 20l-6-2.5L4 20Z" /><path d="M9 4v13.5M15 6.5V20" /></svg>
+            </span>
+            <div>
+              <small>Dinsdag</small>
+              <h3>Plattegrond Toverland</h3>
+              <p>Met de ranjapost en verzamelplek duidelijk aangegeven.</p>
+            </div>
+          </header>
+          <button class="toverland-map-button" type="button" data-toverland-resource="map">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5 9 4l6 2.5L20 4v13.5L15 20l-6-2.5L4 20Z" /><path d="M9 4v13.5M15 6.5V20" /></svg>
+            <span>Open plattegrond</span>
+            <svg class="toverland-map-button-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+          </button>
+        </section>
         <div class="schedule-board" id="scheduleBoard" aria-label="Dagprogramma"></div>
+      </section>
+
+      <section class="content-view hidden public-instruction-view" id="instructionLibraryView" aria-label="Spelinstructies">
+        <div class="public-instruction-header">
+          <button class="icon-button public-instruction-back" id="closeInstructionLibraryButton" type="button" aria-label="Terug naar programma">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+          </button>
+          <div>
+            <h2>Spelinstructies</h2>
+            <p id="publicInstructionCount"></p>
+          </div>
+        </div>
+        <div class="public-instruction-toolbar">
+          <label class="search-box public-instruction-search">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+            <input id="publicInstructionSearch" type="search" placeholder="Zoek spel of activiteit" autocomplete="off" />
+          </label>
+          <div class="public-instruction-filters" id="publicInstructionFilters" aria-label="Filter op doelgroep"></div>
+        </div>
+        <div class="public-instruction-results" id="publicInstructionResults" aria-live="polite"></div>
       </section>
 
       <section class="content-view hidden" id="setupView" aria-label="Opbouw">
@@ -177,6 +247,7 @@
           <p>Overzicht van ruimtes per dag.</p>
         </div>
         <div class="room-schedule-switch" id="roomScheduleSwitch" aria-label="Kies dag"></div>
+        <div class="room-schedule-legend" id="roomScheduleLegend" aria-label="Kleuren per doelgroep"></div>
         <div class="room-schedule-board" id="roomScheduleBoard" aria-label="Tijdschema ruimtes"></div>
       </section>
 
@@ -239,6 +310,40 @@
           </form>
           <div class="important-info-list" id="importantInfoList"></div>
         </div>
+      </section>
+
+      <section class="content-view hidden" id="agreementsView" aria-label="Algemene afspraken">
+        <div class="section-title">
+          <h2>Algemene afspraken</h2>
+          <p>Alles wat we samen afspreken voor een veilige en fijne KVW-week.</p>
+        </div>
+        <div class="agreements-layout">
+          <article class="agreements-summary-card">
+            <div>
+              <span class="agreements-eyebrow">De kern</span>
+              <h3>Geef het goede voorbeeld</h3>
+              <p>Samen zorgen we ervoor dat kinderen en vrijwilligers met een goed gevoel op de KVW-week terugkijken.</p>
+            </div>
+            <ul>
+              <li>Kom afspraken na</li>
+              <li>Praat respectvol</li>
+              <li>Doe actief mee</li>
+              <li>Let goed op de kinderen</li>
+              <li>Vraag hulp wanneer dat nodig is</li>
+              <li>Zorg voor een veilige en gezellige sfeer</li>
+            </ul>
+          </article>
+
+          <div class="agreements-list" id="agreementsList"></div>
+        </div>
+      </section>
+
+      <section class="content-view hidden" id="boardView" aria-label="Bestuur en ondersteuning">
+        <div class="section-title">
+          <h2>Bestuur &amp; ondersteuning</h2>
+          <p>Het bestuur en de ondersteunende teams staan voor je klaar tijdens de KVW-week.</p>
+        </div>
+        <div class="board-grid" id="boardGrid"></div>
       </section>
 
       <section class="content-view hidden" id="groupsView" aria-label="Groepen">
@@ -312,6 +417,10 @@
               <button class="admin-only management-tile" type="button" data-management-target="groups">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18" /><path d="M3 12h18" /><path d="M3 17h18" /><path d="M7 4v16" /></svg>
                 <span><strong>Groepen en kinderen</strong><small>Indeling en koppelingen</small></span>
+              </button>
+              <button class="admin-only management-tile" type="button" data-management-target="instructions">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 5.5A2.5 2.5 0 0 1 4.5 3H11v16H4.5A2.5 2.5 0 0 0 2 21.5Z" /><path d="M22 5.5A2.5 2.5 0 0 0 19.5 3H13v16h6.5a2.5 2.5 0 0 1 2.5 2.5Z" /></svg>
+                <span><strong>Spelinstructies</strong><small>Bestanden en programma koppelen</small></span>
               </button>
             </div>
 
@@ -390,6 +499,11 @@
                   <div class="leader-list" id="managersList"></div>
                 </div>
               </div>
+              <details class="board-profile-admin">
+                <summary>Profielen bestuur &amp; ondersteuning beheren</summary>
+                <p>Voeg per persoon een functie, korte introductie, mobiel nummer en foto toe.</p>
+                <div class="board-profile-editor" id="boardProfileEditor"></div>
+              </details>
             </section>
 
             <section class="admin-only manager-section management-panel management-panel-hidden" data-management-panel="import">
@@ -408,7 +522,7 @@
                 <form class="manager-form bulk-import-form" id="bulkUsersForm">
                   <label for="bulkUsersCsv">Gebruikers importeren</label>
                   <input id="bulkUsersCsv" type="file" accept=".csv,text/csv" />
-                  <p>CSV-kolommen: naam, rol, groepen</p>
+                  <p>CSV-kolommen: naam, rol, groepen. Voor bestuursleden optioneel: functie, introductie, telefoon, foto.</p>
                   <button type="submit">Gebruikers importeren</button>
                 </form>
               </div>
@@ -444,6 +558,38 @@
                 </div>
               </form>
               <div class="manager-groups" id="managerGroups" aria-label="Groepen beheren"></div>
+            </section>
+
+            <section class="admin-only manager-section management-panel management-panel-hidden instruction-management-panel" data-management-panel="instructions">
+              <button class="management-back" type="button" data-management-back>Terug naar beheer</button>
+              <div class="manager-section-header instruction-section-title">
+                <div>
+                  <h3>Spelinstructies</h3>
+                  <p>Voeg instructies toe en koppel ze aan activiteiten in het programma.</p>
+                </div>
+                <button class="instruction-add-button" id="addInstructionButton" type="button" aria-label="Nieuwe spelinstructie">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+                  <span>Toevoegen</span>
+                </button>
+              </div>
+              <div class="instruction-toolbar">
+                <label class="search-box instruction-search">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+                  <input id="instructionSearch" type="search" placeholder="Zoek instructie" autocomplete="off" />
+                </label>
+                <select id="instructionCategoryFilter" aria-label="Filter op doelgroep">
+                  <option value="all">Alle doelgroepen</option>
+                  <option value="kleuters">Kleuters</option>
+                  <option value="pupillen">Pupillen</option>
+                  <option value="jongeren">Jongeren</option>
+                  <option value="ouderen">Ouderen</option>
+                  <option value="all-groups">Alle groepen</option>
+                </select>
+              </div>
+              <div class="instruction-layout">
+                <div class="instruction-library" id="instructionList" aria-label="Instructiebibliotheek"></div>
+                <div class="instruction-detail" id="instructionDetail" aria-live="polite"></div>
+              </div>
             </section>
           </div>
         </div>
@@ -563,6 +709,114 @@
       </div>
     </section>
 
+    <section class="instruction-modal hidden" id="instructionModal" aria-label="Spelinstructie bewerken" aria-modal="true" role="dialog">
+      <form class="instruction-editor" id="instructionForm">
+        <div class="instruction-editor-header">
+          <div>
+            <span>Spelinstructie</span>
+            <h2 id="instructionFormTitle">Nieuwe instructie</h2>
+          </div>
+          <button class="instruction-icon-button" id="cancelInstructionButton" type="button" aria-label="Sluiten">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <input id="instructionId" type="hidden" />
+        <label for="instructionTitle">Titel</label>
+        <input id="instructionTitle" type="text" maxlength="120" required autocomplete="off" />
+        <label for="instructionCategory">Doelgroep</label>
+        <select id="instructionCategory" required>
+          <option value="kleuters">Kleuters</option>
+          <option value="pupillen">Pupillen</option>
+          <option value="jongeren">Jongeren</option>
+          <option value="ouderen">Ouderen</option>
+          <option value="all-groups">Alle groepen</option>
+        </select>
+        <label for="instructionSummary">Korte omschrijving</label>
+        <textarea id="instructionSummary" rows="2" maxlength="300"></textarea>
+        <label for="instructionBody">Spelverloop</label>
+        <textarea id="instructionBody" rows="7"></textarea>
+        <div class="instruction-editor-split">
+          <label>
+            <span>Benodigdheden</span>
+            <textarea id="instructionMaterials" rows="4"></textarea>
+          </label>
+          <label>
+            <span>Veiligheid</span>
+            <textarea id="instructionSafety" rows="4"></textarea>
+          </label>
+        </div>
+        <label for="instructionFiles">PDF’s en afbeeldingen</label>
+        <input id="instructionFiles" type="file" accept="application/pdf,image/jpeg,image/png,image/webp,image/gif" multiple />
+        <p class="instruction-upload-status" id="instructionUploadStatus" role="status"></p>
+        <div class="instruction-editor-actions">
+          <button class="text-button" id="cancelInstructionFooterButton" type="button">Annuleren</button>
+          <button class="primary-action" id="saveInstructionButton" type="submit">Opslaan</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="instruction-image-viewer hidden" id="instructionImageViewer" aria-label="Spelinstructie" aria-modal="true" aria-hidden="true" role="dialog">
+      <button class="instruction-image-viewer-close" id="closeInstructionImageViewer" type="button" aria-label="Afbeelding sluiten">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+      </button>
+      <button class="instruction-image-viewer-nav previous hidden" id="previousInstructionViewerItem" type="button" aria-label="Vorige pagina">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+      </button>
+      <figure>
+        <img id="instructionImageViewerImage" src="" alt="" />
+        <iframe class="hidden" id="instructionDocumentViewer" src="about:blank" title="Spelinstructie PDF"></iframe>
+        <article class="instruction-viewer-text hidden" id="instructionTextViewer">
+          <h2 id="instructionTextViewerTitle"></h2>
+          <p id="instructionTextViewerSummary"></p>
+          <section id="instructionTextViewerBody"></section>
+        </article>
+        <figcaption><span id="instructionImageViewerCaption"></span><small id="instructionImageViewerCount"></small></figcaption>
+      </figure>
+      <button class="instruction-image-viewer-nav next hidden" id="nextInstructionViewerItem" type="button" aria-label="Volgende pagina">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+      </button>
+    </section>
+
+    <section class="board-guide-viewer hidden" id="boardGuideViewer" aria-label="Draaiboek bestuur" aria-modal="true" aria-hidden="true" role="dialog">
+      <header>
+        <div>
+          <small>Alleen voor bestuursleden</small>
+          <strong>Draaiboek bestuur</strong>
+        </div>
+        <nav aria-label="Draaiboek acties">
+          <a href="./assets/board/draaiboek-bestuur.pdf" target="_blank" rel="noopener noreferrer" aria-label="Draaiboek extern openen" title="Extern openen">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7M10 14 21 3" /><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5" /></svg>
+          </a>
+          <a href="./assets/board/draaiboek-bestuur.pdf" download="KVW-draaiboek-bestuur.pdf" aria-label="Draaiboek downloaden" title="Downloaden">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" /></svg>
+          </a>
+          <button id="closeBoardGuideButton" type="button" aria-label="Draaiboek sluiten" title="Sluiten">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+          </button>
+        </nav>
+      </header>
+      <iframe id="boardGuideFrame" src="about:blank" title="PDF draaiboek bestuur"></iframe>
+    </section>
+
+    <section class="toverland-roster-modal hidden" id="toverlandRosterModal" aria-label="Dienstrooster Toverland" aria-modal="true" aria-hidden="true" role="dialog">
+      <div class="toverland-roster-sheet">
+        <header>
+          <div>
+            <small>Toverland · dinsdag</small>
+            <h2>Dienstrooster</h2>
+          </div>
+          <button id="closeToverlandRoster" type="button" aria-label="Dienstrooster sluiten">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+          </button>
+        </header>
+        <div class="toverland-roster-tabs" role="group" aria-label="Kies roosterweergave">
+          <button type="button" data-toverland-roster-mode="mine">Mijn diensten</button>
+          <button type="button" data-toverland-roster-mode="all">Volledig rooster</button>
+        </div>
+        <div class="toverland-roster-content" id="toverlandRosterContent"></div>
+      </div>
+    </section>
+
     <div class="save-celebration" id="saveCelebration" aria-hidden="true">
       <div class="celebration-burst" aria-hidden="true"></div>
       <div class="celebration-check" aria-label="Opgeslagen">
@@ -576,6 +830,10 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./supabase-config.js"></script>
-    <script src="./app.js"></script>
+    <script src="./program-data.js?v=20260811-heukelom-route"></script>
+    <script src="./timetable-data.js"></script>
+    <script src="./instruction-data.js"></script>
+    <script src="./agreements-data.js?v=20260810"></script>
+    <script src="./app.js?v=20260812-support-profiles"></script>
   </body>
 </html>

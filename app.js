@@ -1,7 +1,30 @@
 const storeKey = "summer-attendance-v1";
 const backupStoreKey = "summer-attendance-backup-before-db";
 const lastUserKey = "summer-attendance-last-user";
+const recentInstructionsKey = "summer-attendance-recent-instructions";
 const managerPasswordValue = "summer2026";
+const instructionBucket = "game-instructions";
+const instructionMaxFileSize = 8 * 1024 * 1024;
+const instructionLocalFileLimit = 750 * 1024;
+const instructionLibraryVersion = Math.max(0, Number(window.KVW_INSTRUCTION_LIBRARY_VERSION) || 0);
+const builtInGameInstructions = Array.isArray(window.KVW_BUILT_IN_INSTRUCTIONS)
+  ? structuredClone(window.KVW_BUILT_IN_INSTRUCTIONS)
+  : [];
+const agreementsLibraryVersion = Math.max(0, Number(window.KVW_AGREEMENTS_LIBRARY_VERSION) || 0);
+const builtInGeneralAgreements = Array.isArray(window.KVW_BUILT_IN_AGREEMENTS)
+  ? structuredClone(window.KVW_BUILT_IN_AGREEMENTS)
+  : [];
+const agreementCategories = [
+  { id: "daily", label: "Dagelijkse begeleiding", shortLabel: "Dagelijks" },
+  { id: "safety", label: "Veiligheid en omgang", shortLabel: "Veiligheid" },
+  { id: "practical", label: "Praktische regels", shortLabel: "Praktisch" },
+  { id: "special", label: "Kamp en hulp", shortLabel: "Kamp en hulp" }
+];
+
+const defaultSupportProfiles = [
+  { id: "support-mariska-wouters", name: "Mariska Wouters", boardRole: "Catering", intro: "Voor alles rond de catering.", phone: "", photo: "" },
+  { id: "support-franky-recollecte", name: "Franky Recollecte", boardRole: "Materialen", intro: "Voor alles rond materialen.", phone: "", photo: "" }
+];
 
 const seed = {
   activeGroupId: "sunbeams",
@@ -60,10 +83,15 @@ const seed = {
     { id: "manager-lotte", name: "Lotte Beheerder" },
     { id: "manager-mark", name: "Mark Coördinator" }
   ],
+  supportProfiles: structuredClone(defaultSupportProfiles),
   userPins: {},
   userThemes: {},
   feedback: [],
   importantInfo: [],
+  generalAgreements: [],
+  generalAgreementsVersion: 0,
+  gameInstructions: [],
+  instructionLibraryVersion: 0,
   setupModuleEnabled: false,
   setupTasks: [
     { id: "setup-aula", title: "Aula klaarzetten", area: "Odulphus", maxPeople: 2, assignees: [], done: false, checkedBy: "", checkedAt: "" },
@@ -141,7 +169,7 @@ const scheduleDays = [
 ];
 
 const scheduleCategories = ["kleuters", "pupillen", "jongeren", "ouderen"];
-const schedulePrograms = {
+const legacySchedulePrograms = {
   "kleuters": [
     [
       {
@@ -1826,7 +1854,8 @@ const schedulePrograms = {
         "time": "10:00",
         "title": "Fietsen naar Heukelom",
         "detail": "Controleer of alle fietsen in goede staat zijn, zorg voor fluorescerende hesjes voor alle leiding en zorg dat je een bandenplaksetje bij je hebt. In een grote groep wordt er naar de locatie in Heukelom gefietst. Iedereen rijdt twee-aan-twee, leiding vooraan en achteraan de groep. Zorg dat je als leiding de route kent. Deze vind je in het draaiboek.",
-        "type": "rest"
+        "type": "rest",
+        "routeUrl": "https://maps.app.goo.gl/mA2iY9o2Cx9bn4Te7"
       },
       {
         "time": "11:00",
@@ -2078,11 +2107,98 @@ const schedulePrograms = {
   ]
 };
 
+const schedulePrograms = window.KVW_PROGRAM_DATA || legacySchedulePrograms;
+const scheduleThemes = window.KVW_PROGRAM_THEMES || {};
+const scheduleActivityIndex = buildScheduleActivityIndex(schedulePrograms);
+
 let scheduleDayIndex = 0;
 let scheduleCategory = scheduleCategories[0];
-let scheduleSwipeStartX = 0;
+let scheduleSwipeStartX = null;
+const scheduleRotationUI = new Map();
+const toverlandResources = {
+  map: {
+    kind: "pdf",
+    url: "./assets/toverland/plattegrond-toverland.pdf#view=FitH",
+    title: "Plattegrond Toverland"
+  },
+  ranjapost: {
+    kind: "image",
+    url: "./assets/toverland/instructie-ranjapost.png",
+    title: "Instructiekaart ranjapost"
+  },
+  "meeting-point": {
+    kind: "image",
+    url: "./assets/toverland/instructie-verzamelplek.png",
+    title: "Instructiekaart verzamelplek"
+  }
+};
+const toverlandRoster = [
+  { time: "11:00 - 11:45", ranjapost: ["Dylan Kruis", "Roos Post"], meetingPoint: ["Finn Verbraak"] },
+  { time: "11:45 - 12:30", ranjapost: ["Isabel Bruijns", "Mila Reith"], meetingPoint: ["Floris van der Lee"] },
+  { time: "12:30 - 13:15", ranjapost: ["Henrike Maaskant", "Moessa Mbarki"], meetingPoint: ["Ricky de Laat"] },
+  { time: "13:15 - 14:00", ranjapost: ["Robin Rongen", "Sara Meijs"], meetingPoint: ["Roan van Heijst"] },
+  { time: "14:00 - 14:45", ranjapost: ["Thijs van Stokkum", "Robijn Conradi"], meetingPoint: ["Joep Schutselaars"] },
+  { time: "14:45 - 15:30", ranjapost: ["Iby van de Hout", "Ashley van der Vliet"], meetingPoint: ["Kate Fonk"] }
+];
+let toverlandRosterMode = "mine";
+let toverlandRosterReturnFocus = null;
+const cleaningRosterPdf = "./assets/cleaning/schoonmaakrooster-kvw-2026.pdf#view=FitH";
+const cleaningRosterByDay = {
+  0: [
+    { task: "Kantine opruimen en poetsen", groups: ["Pupillen 2"] },
+    { task: "Sportveld opruimen", groups: ["Jongeren 1"] },
+    { task: "Gymzaal Laagstraat opruimen", groups: ["Kleuters 1b"] },
+    { task: "Gymzaal Wilgenstraat opruimen", groups: ["Kleuters 4b"] },
+    { task: "Keuken opruimen en poetsen", groups: ["Ouderen 3"] },
+    { task: "Toiletten kantine schoonmaken", groups: ["Kleuters 2a"] },
+    { task: "Toiletten gymzalen schoonmaken", groups: ["Kleuters 3b"] },
+    { task: "Binnenplaats opruimen", groups: ["Ouderen 1+2"] },
+    { task: "Kleuterhoek opruimen", groups: ["Kleuters 2b"] },
+    { task: "Gangen vegen/stofzuigen", groups: ["Jongeren 4"] }
+  ],
+  1: [
+    { task: "Toiletten kantine schoonmaken", groups: ["Pupillen 1"] },
+    { task: "Toiletten gymzalen schoonmaken", groups: ["Kleuters 1b"] }
+  ],
+  2: [
+    { task: "Kantine opruimen en poetsen", groups: ["Jongeren 3"] },
+    { task: "Sportveld opruimen", groups: ["Kleuters 3a"] },
+    { task: "Gymzaal Laagstraat opruimen", groups: ["Kleuters 4b"] },
+    { task: "Gymzaal Wilgenstraat opruimen", groups: ["Pupillen 2"] },
+    { task: "Keuken opruimen en poetsen", groups: ["Kleuters 1b"] },
+    { task: "Toiletten kantine schoonmaken", groups: ["Pupillen 3"] },
+    { task: "Toiletten gymzalen schoonmaken", groups: ["Jongeren 4"] },
+    { task: "Binnenplaats opruimen", groups: ["Jongeren 2"] },
+    { task: "Kleuterhoek opruimen", groups: ["Kleuters 2b"] },
+    { task: "Gangen vegen/stofzuigen", groups: ["Jongeren 1"] }
+  ],
+  3: [
+    { task: "Kantine opruimen en poetsen", groups: ["Kleuters 3b"] },
+    { task: "Sportveld opruimen", groups: ["Kleuters 2a"] },
+    { task: "Gymzaal Laagstraat opruimen", groups: ["Jongeren 1"] },
+    { task: "Gymzaal Wilgenstraat opruimen", groups: ["Pupillen 2"] },
+    { task: "Keuken opruimen en poetsen", groups: ["Jongeren 2"] },
+    { task: "Toiletten kantine schoonmaken", groups: ["Kleuters 2b"] },
+    { task: "Toiletten gymzalen schoonmaken", groups: ["Kleuters 1a"] },
+    { task: "Binnenplaats opruimen", groups: ["Kleuters 3a"] },
+    { task: "Kleuterhoek opruimen", groups: ["Kleuters 4a"] },
+    { task: "Gangen vegen/stofzuigen", groups: ["Jongeren 3"] }
+  ],
+  4: [
+    { task: "Kantine opruimen en poetsen", groups: ["Kleuters 3a"] },
+    { task: "Sportveld opruimen", groups: ["Kleuters 2a"] },
+    { task: "Gymzaal Laagstraat opruimen", groups: ["Kleuters 1a"] },
+    { task: "Gymzaal Wilgenstraat opruimen", groups: ["Kleuters 4a"] },
+    { task: "Keuken opruimen en poetsen", groups: ["Pupillen 3"] },
+    { task: "Toiletten kantine schoonmaken", groups: ["Jongeren 2"] },
+    { task: "Toiletten gymzalen schoonmaken", groups: ["Ouderen 3"] },
+    { task: "Binnenplaats opruimen", groups: ["Ouderen 1+2"] },
+    { task: "Kleuterhoek opruimen", groups: ["Kleuters 2b"] },
+    { task: "Gangen vegen/stofzuigen", groups: ["Pupillen 1"] }
+  ]
+};
 
-const roomScheduleDays = [
+const legacyRoomScheduleDays = [
   {
     label: "Maandag",
     date: "17 aug",
@@ -2237,7 +2353,7 @@ const roomScheduleDays = [
   }
 ];
 
-const roomScheduleRooms = [
+const legacyRoomScheduleRooms = [
   "Gymzaal Laagstraat",
   "Gymzaal Wilgenstraat",
   "Aula",
@@ -2245,6 +2361,11 @@ const roomScheduleRooms = [
   "Sportveld",
   "Extern / overig"
 ];
+
+const roomScheduleData = window.KVW_TIMETABLE_DATA || {};
+const roomScheduleDays = roomScheduleData.days || legacyRoomScheduleDays;
+const roomScheduleRooms = roomScheduleData.rooms || legacyRoomScheduleRooms;
+const roomScheduleLegendItems = roomScheduleData.legend || [];
 
 let roomScheduleDayIndex = 0;
 
@@ -2279,6 +2400,8 @@ const leadersList = document.querySelector("#leadersList");
 const addManagerForm = document.querySelector("#addManagerForm");
 const newManagerName = document.querySelector("#newManagerName");
 const managersList = document.querySelector("#managersList");
+const boardGrid = document.querySelector("#boardGrid");
+const boardProfileEditor = document.querySelector("#boardProfileEditor");
 const bulkKidsForm = document.querySelector("#bulkKidsForm");
 const bulkKidsCsv = document.querySelector("#bulkKidsCsv");
 const bulkUsersForm = document.querySelector("#bulkUsersForm");
@@ -2306,10 +2429,57 @@ const scheduleDayName = document.querySelector("#scheduleDayName");
 const scheduleDayRange = document.querySelector("#scheduleDayRange");
 const scheduleCategorySwitch = document.querySelector("#scheduleCategorySwitch");
 const scheduleBoard = document.querySelector("#scheduleBoard");
+const toverlandHub = document.querySelector("#toverlandHub");
+const toverlandRosterModal = document.querySelector("#toverlandRosterModal");
+const toverlandRosterContent = document.querySelector("#toverlandRosterContent");
+const closeToverlandRosterButton = document.querySelector("#closeToverlandRoster");
 const prevScheduleDay = document.querySelector("#prevScheduleDay");
 const nextScheduleDay = document.querySelector("#nextScheduleDay");
+const openInstructionLibraryButton = document.querySelector("#openInstructionLibraryButton");
+const closeInstructionLibraryButton = document.querySelector("#closeInstructionLibraryButton");
+const publicInstructionSearch = document.querySelector("#publicInstructionSearch");
+const publicInstructionFilters = document.querySelector("#publicInstructionFilters");
+const publicInstructionResults = document.querySelector("#publicInstructionResults");
+const publicInstructionCount = document.querySelector("#publicInstructionCount");
 const roomScheduleSwitch = document.querySelector("#roomScheduleSwitch");
+const roomScheduleLegend = document.querySelector("#roomScheduleLegend");
 const roomScheduleBoard = document.querySelector("#roomScheduleBoard");
+const instructionSearch = document.querySelector("#instructionSearch");
+const instructionCategoryFilter = document.querySelector("#instructionCategoryFilter");
+const instructionList = document.querySelector("#instructionList");
+const instructionDetail = document.querySelector("#instructionDetail");
+const addInstructionButton = document.querySelector("#addInstructionButton");
+const instructionModal = document.querySelector("#instructionModal");
+const instructionForm = document.querySelector("#instructionForm");
+const instructionFormTitle = document.querySelector("#instructionFormTitle");
+const instructionId = document.querySelector("#instructionId");
+const instructionTitle = document.querySelector("#instructionTitle");
+const instructionCategory = document.querySelector("#instructionCategory");
+const instructionSummary = document.querySelector("#instructionSummary");
+const instructionBody = document.querySelector("#instructionBody");
+const instructionMaterials = document.querySelector("#instructionMaterials");
+const instructionSafety = document.querySelector("#instructionSafety");
+const instructionFiles = document.querySelector("#instructionFiles");
+const instructionUploadStatus = document.querySelector("#instructionUploadStatus");
+const saveInstructionButton = document.querySelector("#saveInstructionButton");
+const cancelInstructionButton = document.querySelector("#cancelInstructionButton");
+const cancelInstructionFooterButton = document.querySelector("#cancelInstructionFooterButton");
+const instructionImageViewer = document.querySelector("#instructionImageViewer");
+const instructionImageViewerImage = document.querySelector("#instructionImageViewerImage");
+const instructionImageViewerCaption = document.querySelector("#instructionImageViewerCaption");
+const instructionImageViewerCount = document.querySelector("#instructionImageViewerCount");
+const instructionDocumentViewer = document.querySelector("#instructionDocumentViewer");
+const boardGuideButton = document.querySelector("#boardGuideButton");
+const boardGuideViewer = document.querySelector("#boardGuideViewer");
+const boardGuideFrame = document.querySelector("#boardGuideFrame");
+const closeBoardGuideButton = document.querySelector("#closeBoardGuideButton");
+const instructionTextViewer = document.querySelector("#instructionTextViewer");
+const instructionTextViewerTitle = document.querySelector("#instructionTextViewerTitle");
+const instructionTextViewerSummary = document.querySelector("#instructionTextViewerSummary");
+const instructionTextViewerBody = document.querySelector("#instructionTextViewerBody");
+const closeInstructionImageViewerButton = document.querySelector("#closeInstructionImageViewer");
+const previousInstructionViewerItemButton = document.querySelector("#previousInstructionViewerItem");
+const nextInstructionViewerItemButton = document.querySelector("#nextInstructionViewerItem");
 const feedbackForm = document.querySelector("#feedbackForm");
 const feedbackCategory = document.querySelector("#feedbackCategory");
 const feedbackText = document.querySelector("#feedbackText");
@@ -2323,6 +2493,7 @@ const importantInfoUrgency = document.querySelector("#importantInfoUrgency");
 const importantInfoTitle = document.querySelector("#importantInfoTitle");
 const importantInfoText = document.querySelector("#importantInfoText");
 const importantInfoList = document.querySelector("#importantInfoList");
+const agreementsList = document.querySelector("#agreementsList");
 const setupHomeTile = document.querySelector("#setupHomeTile");
 const setupSummary = document.querySelector("#setupSummary");
 const setupTaskList = document.querySelector("#setupTaskList");
@@ -2357,6 +2528,16 @@ const switchUserButton = document.querySelector("#switchUserButton");
 let managementUnlocked = false;
 let pendingUser = null;
 let activeManagementPanel = "";
+let activeInstructionId = "";
+let instructionActivityFilter = "";
+let instructionLinkCategory = scheduleCategories[0];
+let instructionLinkDayIndex = 0;
+let instructionImageViewerReturnFocus = null;
+let instructionViewerItems = [];
+let instructionViewerIndex = 0;
+let boardGuideReturnFocus = null;
+let publicInstructionCategory = "all";
+let openAgreementId = "";
 
 function loadState() {
   const stored = localStorage.getItem(storeKey);
@@ -2382,7 +2563,11 @@ function backupLocalState(reason = "database-sync") {
 }
 
 function persist() {
-  localStorage.setItem(storeKey, JSON.stringify(state));
+  try {
+    localStorage.setItem(storeKey, JSON.stringify(state));
+  } catch (error) {
+    console.warn("Lokale opslag is vol; database-opslag blijft actief", error);
+  }
   queueRemoteSave();
 }
 
@@ -2391,10 +2576,15 @@ function sharedStateSnapshot() {
     groups: state.groups,
     leaders: state.leaders,
     managers: state.managers,
+    supportProfiles: state.supportProfiles,
     userPins: state.userPins,
     userThemes: state.userThemes,
     feedback: state.feedback,
     importantInfo: state.importantInfo,
+    generalAgreements: state.generalAgreements,
+    generalAgreementsVersion: state.generalAgreementsVersion,
+    gameInstructions: state.gameInstructions,
+    instructionLibraryVersion: state.instructionLibraryVersion,
     setupModuleEnabled: state.setupModuleEnabled,
     setupTasks: state.setupTasks,
     days: state.days,
@@ -2403,8 +2593,90 @@ function sharedStateSnapshot() {
   };
 }
 
+function stableJsonStringify(value) {
+  return JSON.stringify(value, (_key, nestedValue) => {
+    if (!nestedValue || typeof nestedValue !== "object" || Array.isArray(nestedValue)) return nestedValue;
+    return Object.fromEntries(
+      Object.keys(nestedValue)
+        .sort()
+        .map((key) => [key, nestedValue[key]])
+    );
+  });
+}
+
 function sharedStateJson() {
-  return JSON.stringify(sharedStateSnapshot());
+  return stableJsonStringify(sharedStateSnapshot());
+}
+
+const sharedStateKeys = [
+  "groups",
+  "leaders",
+  "managers",
+  "supportProfiles",
+  "userPins",
+  "userThemes",
+  "feedback",
+  "importantInfo",
+  "generalAgreements",
+  "generalAgreementsVersion",
+  "gameInstructions",
+  "instructionLibraryVersion",
+  "setupModuleEnabled",
+  "setupTasks",
+  "days",
+  "attendance",
+  "savedAt"
+];
+
+function changedSharedStateKeys(previousState, nextState) {
+  return new Set(sharedStateKeys.filter((key) => (
+    stableJsonStringify(previousState?.[key]) !== stableJsonStringify(nextState?.[key])
+  )));
+}
+
+function remoteUpdateToastMessage(changedKeys) {
+  const changed = (...keys) => keys.some((key) => changedKeys.has(key));
+
+  if (state.activeView === "todayView" && changed("attendance", "savedAt", "days")) {
+    return "Aanwezigheid bijgewerkt door een andere gebruiker";
+  }
+  if (state.activeView === "feedbackView" && changed("feedback")) {
+    return "Evaluaties bijgewerkt door een andere gebruiker";
+  }
+  if (["homeView", "contactsView"].includes(state.activeView) && changed("importantInfo")) {
+    return "Belangrijke info bijgewerkt";
+  }
+  if (["homeView", "agreementsView"].includes(state.activeView) && changed("generalAgreements")) {
+    return "Algemene afspraken bijgewerkt";
+  }
+  if (["homeView", "setupView"].includes(state.activeView) && changed("setupModuleEnabled", "setupTasks")) {
+    return "Opbouw bijgewerkt door een andere gebruiker";
+  }
+  if (["scheduleView", "instructionLibraryView"].includes(state.activeView) && changed("gameInstructions", "instructionLibraryVersion")) {
+    return "Spelinstructies bijgewerkt";
+  }
+  if (["todayView", "groupsView", "kidsView"].includes(state.activeView) && changed("groups", "leaders", "managers")) {
+    return "Groepen bijgewerkt door een andere gebruiker";
+  }
+  if (state.activeView === "boardView" && changed("managers", "supportProfiles")) {
+    return "Profielen bijgewerkt";
+  }
+  if (state.activeView === "managementView") {
+    if (activeManagementPanel === "instructions" && changed("gameInstructions", "instructionLibraryVersion")) {
+      return "Spelinstructies bijgewerkt";
+    }
+    if (activeManagementPanel === "groups" && changed("groups", "leaders")) {
+      return "Groepen bijgewerkt door een andere gebruiker";
+    }
+    if (["users", "overview"].includes(activeManagementPanel) && changed("groups", "leaders", "managers")) {
+      return "Beheergegevens bijgewerkt";
+    }
+    if (activeManagementPanel === "access" && changed("userPins", "userThemes")) {
+      return "Toegangsinstellingen bijgewerkt";
+    }
+  }
+
+  return "";
 }
 
 function peopleCount(source) {
@@ -2440,7 +2712,7 @@ function applySharedState(sharedState) {
 
   state = normalizeState({ ...structuredClone(seed), ...sharedState });
   state.currentUser = session.currentUser && userExists(state, session.currentUser) ? session.currentUser : null;
-  state.activeView = ["homeView", "todayView", "scheduleView", "setupView", "roomScheduleView", "feedbackView", "contactsView", "groupsView", "kidsView", "managementView"].includes(session.activeView)
+  state.activeView = ["homeView", "todayView", "scheduleView", "instructionLibraryView", "setupView", "roomScheduleView", "feedbackView", "contactsView", "agreementsView", "boardView", "groupsView", "kidsView", "managementView"].includes(session.activeView)
     ? session.activeView
     : "homeView";
   if (!state.setupModuleEnabled && state.activeView === "setupView") {
@@ -2452,7 +2724,11 @@ function applySharedState(sharedState) {
   state.activeGroupId = visibleGroups.some((group) => group.id === session.activeGroupId)
     ? session.activeGroupId
     : visibleGroups[0]?.id || state.groups[0]?.id || "";
-  lastSharedStateJson = sharedStateJson();
+  const normalizedSharedStateJson = sharedStateJson();
+  const incomingSharedStateJson = stableJsonStringify(sharedState);
+  lastSharedStateJson = incomingSharedStateJson === normalizedSharedStateJson
+    ? normalizedSharedStateJson
+    : incomingSharedStateJson;
   queuedSharedStateJson = "";
 }
 
@@ -2543,7 +2819,7 @@ async function initDatabase() {
   }
 
   databaseReady = true;
-  if (!data?.state) await saveRemoteState();
+  if (!data?.state || lastSharedStateJson !== sharedStateJson()) await saveRemoteState();
 
   databaseClient
     .channel("kvw-app-state")
@@ -2551,7 +2827,15 @@ async function initDatabase() {
       if (!payload.new?.state || payload.new.updated_at === lastRemoteUpdate) return;
       if (remoteUpdatedAtMs(payload.new.updated_at) < lastLocalChangeAt) return;
 
-      const incomingSharedStateJson = JSON.stringify(payload.new.state);
+      const incomingSharedStateJson = stableJsonStringify(payload.new.state);
+      const changedKeys = changedSharedStateKeys(sharedStateSnapshot(), payload.new.state);
+      if (!changedKeys.size) {
+        lastRemoteUpdate = payload.new.updated_at || "";
+        lastSharedStateJson = incomingSharedStateJson;
+        queuedSharedStateJson = "";
+        localSavePending = false;
+        return;
+      }
       if (localSavePending && incomingSharedStateJson !== queuedSharedStateJson) return;
       if (localSavePending && incomingSharedStateJson === queuedSharedStateJson) {
         lastRemoteUpdate = payload.new.updated_at || "";
@@ -2561,12 +2845,14 @@ async function initDatabase() {
         return;
       }
 
+      const updateMessage = remoteUpdateToastMessage(changedKeys);
       applyingRemoteState = true;
       lastRemoteUpdate = payload.new.updated_at || "";
       applySharedState(payload.new.state);
       renderAll();
       applyingRemoteState = false;
-      showToast("Database bijgewerkt");
+      queueRemoteSave();
+      if (updateMessage) showToast(updateMessage);
     })
     .subscribe();
 
@@ -2617,8 +2903,48 @@ function normalizeState(nextState) {
   nextState.savedAt ||= {};
   nextState.userPins ||= {};
   nextState.userThemes ||= {};
-  nextState.feedback = Array.isArray(nextState.feedback) ? nextState.feedback : [];
+  nextState.feedback = Array.isArray(nextState.feedback)
+    ? nextState.feedback.map((entry) => ({
+      ...entry,
+      reactions: entry?.reactions && typeof entry.reactions === "object" && !Array.isArray(entry.reactions)
+        ? entry.reactions
+        : {}
+    }))
+    : [];
   nextState.importantInfo = Array.isArray(nextState.importantInfo) ? nextState.importantInfo : [];
+  nextState.generalAgreements = Array.isArray(nextState.generalAgreements) ? nextState.generalAgreements : [];
+  nextState.generalAgreementsVersion = Math.max(0, Number(nextState.generalAgreementsVersion) || 0);
+  if (nextState.generalAgreementsVersion < agreementsLibraryVersion) {
+    const existingAgreementIds = new Set(nextState.generalAgreements.map((entry) => entry?.id));
+    builtInGeneralAgreements.forEach((agreement) => {
+      if (!existingAgreementIds.has(agreement.id)) nextState.generalAgreements.push(structuredClone(agreement));
+    });
+    nextState.generalAgreementsVersion = agreementsLibraryVersion;
+  }
+  nextState.generalAgreements = nextState.generalAgreements
+    .filter((entry) => entry?.title && entry?.text)
+    .map((entry, index) => ({
+      id: entry.id || `afspraak-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      order: Number.isFinite(Number(entry.order)) ? Number(entry.order) : 1000 + index,
+      category: agreementCategories.some((category) => category.id === entry.category) ? entry.category : "additional",
+      title: String(entry.title),
+      summary: String(entry.summary || String(entry.text).split(/[.!?](?:\s|$)/)[0] || entry.title).trim(),
+      text: String(entry.text),
+      notice: entry.notice && ["warning", "critical"].includes(entry.notice.level) && entry.notice.text
+        ? { level: entry.notice.level, text: String(entry.notice.text) }
+        : null,
+      userName: entry.userName || "",
+      createdAt: entry.createdAt || ""
+    }));
+  nextState.gameInstructions = Array.isArray(nextState.gameInstructions) ? nextState.gameInstructions : [];
+  nextState.instructionLibraryVersion = Math.max(0, Number(nextState.instructionLibraryVersion) || 0);
+  if (nextState.instructionLibraryVersion < instructionLibraryVersion) {
+    const existingInstructionIds = new Set(nextState.gameInstructions.map((instruction) => instruction?.id));
+    builtInGameInstructions.forEach((instruction) => {
+      if (!existingInstructionIds.has(instruction.id)) nextState.gameInstructions.push(structuredClone(instruction));
+    });
+    nextState.instructionLibraryVersion = instructionLibraryVersion;
+  }
   nextState.setupModuleEnabled = Boolean(nextState.setupModuleEnabled);
   nextState.setupTasks = Array.isArray(nextState.setupTasks) ? nextState.setupTasks : structuredClone(seed.setupTasks);
   nextState.currentUser = null;
@@ -2630,8 +2956,29 @@ function normalizeState(nextState) {
 
   nextState.managers = nextState.managers.map((manager) => ({
     id: manager.id || makeId(manager.name || "manager", nextState.managers.map((item) => item.id)),
-    name: defaultPersonTranslations[manager.name] || manager.name || "Naamloos bestuurslid"
+    name: defaultPersonTranslations[manager.name] || manager.name || "Naamloos bestuurslid",
+    boardRole: String(manager.boardRole || "Bestuurslid").trim().slice(0, 80),
+    intro: String(manager.intro || "").trim().slice(0, 280),
+    phone: String(manager.phone || "").trim().slice(0, 32),
+    photo: String(manager.photo || "").trim()
   }));
+
+  const savedSupportProfiles = new Map(
+    (Array.isArray(nextState.supportProfiles) ? nextState.supportProfiles : [])
+      .filter((profile) => profile?.id)
+      .map((profile) => [profile.id, profile])
+  );
+  nextState.supportProfiles = defaultSupportProfiles.map((defaultProfile) => {
+    const profile = savedSupportProfiles.get(defaultProfile.id) || {};
+    return {
+      id: defaultProfile.id,
+      name: defaultProfile.name,
+      boardRole: String(profile.boardRole || defaultProfile.boardRole).trim().slice(0, 80),
+      intro: String(profile.intro || defaultProfile.intro).trim().slice(0, 280),
+      phone: String(profile.phone || "").trim().slice(0, 32),
+      photo: String(profile.photo || "").trim()
+    };
+  });
 
   nextState.groups = nextState.groups.map((group) => ({
     id: group.id || makeId(group.name || "group", nextState.groups.map((item) => item.id)),
@@ -2639,6 +2986,38 @@ function normalizeState(nextState) {
     leaderIds: Array.isArray(group.leaderIds) ? group.leaderIds : [],
     kids: Array.isArray(group.kids) ? group.kids : []
   }));
+
+  const instructionIds = [];
+  nextState.gameInstructions = nextState.gameInstructions.map((instruction) => {
+    const id = instruction.id || makeId(instruction.title || "spelinstructie", instructionIds);
+    instructionIds.push(id);
+    return {
+      id,
+      title: instruction.title || "Naamloze spelinstructie",
+      category: ["kleuters", "pupillen", "jongeren", "ouderen", "all-groups"].includes(instruction.category)
+        ? instruction.category
+        : "all-groups",
+      summary: instruction.summary || "",
+      body: instruction.body || "",
+      materials: instruction.materials || "",
+      safety: instruction.safety || "",
+      activityIds: Array.isArray(instruction.activityIds) ? [...new Set(instruction.activityIds.filter(Boolean))] : [],
+      attachments: Array.isArray(instruction.attachments)
+        ? instruction.attachments
+            .filter((attachment) => attachment?.url && attachment?.name)
+            .map((attachment) => ({
+              id: attachment.id || `${id}-bestand-${Math.random().toString(16).slice(2)}`,
+              name: attachment.name,
+              type: attachment.type || "application/octet-stream",
+              url: attachment.url,
+              path: attachment.path || "",
+              size: Math.max(0, Number(attachment.size) || 0)
+            }))
+        : [],
+      createdBy: instruction.createdBy || "",
+      updatedAt: instruction.updatedAt || ""
+    };
+  });
 
   if (!nextState.days.includes(nextState.activeDay)) {
     nextState.activeDay = nextState.days[0];
@@ -2666,7 +3045,7 @@ function normalizeState(nextState) {
     };
   });
 
-  if (!["homeView", "todayView", "scheduleView", "setupView", "roomScheduleView", "feedbackView", "contactsView", "groupsView", "kidsView", "managementView"].includes(nextState.activeView)) {
+  if (!["homeView", "todayView", "scheduleView", "instructionLibraryView", "setupView", "roomScheduleView", "feedbackView", "contactsView", "agreementsView", "boardView", "groupsView", "kidsView", "managementView"].includes(nextState.activeView)) {
     nextState.activeView = "homeView";
   }
 
@@ -2968,6 +3347,149 @@ function renderManagementPanels() {
   });
 }
 
+function attendanceSnapshotForGroup(group, day = state.activeDay) {
+  const attendance = state.attendance[day]?.[group.id] || {};
+  const present = group.kids.filter((kid) => attendance[kid] === "present").length;
+  const expected = group.kids.length;
+
+  return {
+    expected,
+    present,
+    missing: Math.max(0, expected - present),
+    saved: Boolean(state.savedAt[`${day}-${group.id}`])
+  };
+}
+
+function renderManagerOverviewDashboard(kidCount) {
+  const day = state.activeDay;
+  const snapshots = state.groups.map((group) => ({ group, ...attendanceSnapshotForGroup(group, day) }));
+  const expected = snapshots.reduce((sum, item) => sum + item.expected, 0);
+  const present = snapshots.reduce((sum, item) => sum + item.present, 0);
+  const missing = snapshots.reduce((sum, item) => sum + item.missing, 0);
+  const uncheckedGroups = snapshots.filter((item) => !item.saved);
+  const criticalInfo = state.importantInfo.filter((entry) => entry.urgency === "critical");
+  const groupsWithoutLeaders = state.groups.filter((group) => !group.leaderIds.length);
+  const leaderIdsWithGroup = new Set(state.groups.flatMap((group) => group.leaderIds));
+  const leadersWithoutGroup = state.leaders.filter((leader) => !leaderIdsWithGroup.has(leader.id));
+  const setup = setupProgress();
+  const groupSizes = state.groups.map((group) => ({ name: group.name, size: group.kids.length }));
+  const largestGroup = groupSizes.slice().sort((a, b) => b.size - a.size)[0];
+  const smallestGroup = groupSizes.slice().sort((a, b) => a.size - b.size)[0];
+  const feedbackByCategory = state.feedback.reduce((totals, entry) => {
+    const label = feedbackCategoryLabel(entry.category);
+    totals[label] = (totals[label] || 0) + 1;
+    return totals;
+  }, {});
+  const actionItems = [
+    uncheckedGroups.length ? `${uncheckedGroups.length} groepen hebben de aanwezigheid voor ${day} nog niet opgeslagen.` : "",
+    criticalInfo.length ? `${criticalInfo.length} kritische melding${criticalInfo.length === 1 ? "" : "en"} actief bij Belangrijke info.` : "",
+    groupsWithoutLeaders.length ? `${groupsWithoutLeaders.length} groepen hebben nog geen gekoppelde leider.` : "",
+    leadersWithoutGroup.length ? `${leadersWithoutGroup.length} leiders zijn nog niet aan een groep gekoppeld.` : "",
+    state.setupModuleEnabled && setup.open ? `${setup.open} plekken bij opbouwtaken zijn nog vrij.` : ""
+  ].filter(Boolean);
+
+  managerStats.innerHTML = `
+    <div class="overview-dashboard">
+      <div class="overview-kpis">
+        <article class="overview-kpi">
+          <span>Verwacht</span>
+          <strong>${expected}</strong>
+          <small>${escapeHTML(day)}</small>
+        </article>
+        <article class="overview-kpi positive">
+          <span>Aanwezig</span>
+          <strong>${present}</strong>
+          <small>${expected ? Math.round((present / expected) * 100) : 0}% gemeld</small>
+        </article>
+        <article class="overview-kpi warning">
+          <span>Afwezig / open</span>
+          <strong>${missing}</strong>
+          <small>${uncheckedGroups.length} groepen niet opgeslagen</small>
+        </article>
+        <article class="overview-kpi">
+          <span>Gebruikers</span>
+          <strong>${state.leaders.length + state.managers.length}</strong>
+          <small>${state.groups.length} groepen · ${kidCount} kinderen</small>
+        </article>
+      </div>
+
+      <section class="overview-block ${actionItems.length ? "needs-action" : "all-clear"}">
+        <div class="overview-block-title">
+          <h4>Actie nodig</h4>
+          <span>${actionItems.length || "Alles rustig"}</span>
+        </div>
+        ${actionItems.length
+          ? `<ul class="overview-action-list">${actionItems.map((item) => `<li>${escapeHTML(item)}</li>`).join("")}</ul>`
+          : `<p class="overview-empty">Geen directe aandachtspunten.</p>`}
+      </section>
+
+      <section class="overview-block">
+        <div class="overview-block-title">
+          <h4>Aanwezigheid per groep</h4>
+          <span>${escapeHTML(day)}</span>
+        </div>
+        <div class="overview-group-list">
+          ${snapshots.map((item) => {
+            const percent = item.expected ? Math.round((item.present / item.expected) * 100) : 0;
+            return `
+              <article class="overview-group-row">
+                <div>
+                  <strong>${escapeHTML(item.group.name)}</strong>
+                  <span>${item.present}/${item.expected} aanwezig · ${item.saved ? "opgeslagen" : "nog niet opgeslagen"}</span>
+                </div>
+                <div class="overview-progress" aria-label="${percent}% aanwezig">
+                  <span style="width:${percent}%"></span>
+                </div>
+              </article>
+            `;
+          }).join("") || `<p class="overview-empty">Nog geen groepen aangemaakt.</p>`}
+        </div>
+      </section>
+
+      <div class="overview-split">
+        <section class="overview-block">
+          <div class="overview-block-title">
+            <h4>Evaluatie</h4>
+            <span>${state.feedback.length} totaal</span>
+          </div>
+          ${Object.keys(feedbackByCategory).length
+            ? `<div class="overview-mini-list">${Object.entries(feedbackByCategory).map(([label, total]) => `<span><strong>${escapeHTML(label)}</strong>${total}</span>`).join("")}</div>`
+            : `<p class="overview-empty">Nog geen evaluaties binnen.</p>`}
+          <div class="overview-latest">
+            ${state.feedback.slice(-3).reverse().map((entry) => `<p><strong>${escapeHTML(entry.userName)}</strong> ${escapeHTML(entry.text)}</p>`).join("")}
+          </div>
+        </section>
+
+        <section class="overview-block">
+          <div class="overview-block-title">
+            <h4>Groepen</h4>
+            <span>${groupsWithoutLeaders.length} zonder leider</span>
+          </div>
+          <div class="overview-mini-list">
+            <span><strong>Grootste groep</strong>${largestGroup ? `${escapeHTML(largestGroup.name)} · ${largestGroup.size}` : "-"}</span>
+            <span><strong>Kleinste groep</strong>${smallestGroup ? `${escapeHTML(smallestGroup.name)} · ${smallestGroup.size}` : "-"}</span>
+            <span><strong>Leiders zonder groep</strong>${leadersWithoutGroup.length}</span>
+          </div>
+        </section>
+      </div>
+
+      ${state.setupModuleEnabled ? `
+        <section class="overview-block">
+          <div class="overview-block-title">
+            <h4>Opbouw zondag</h4>
+            <span>${setup.done}/${state.setupTasks.length} taken gecontroleerd</span>
+          </div>
+          <div class="overview-mini-list">
+            <span><strong>Opgepakt</strong>${setup.claimed}</span>
+            <span><strong>Nog vrij</strong>${setup.open}</span>
+            <span><strong>Plekken totaal</strong>${setup.total}</span>
+          </div>
+        </section>
+      ` : ""}
+    </div>
+  `;
+}
+
 function renderManagement() {
   const kidCount = state.groups.reduce((sum, group) => sum + group.kids.length, 0);
   managementIntro.textContent = isManager()
@@ -2980,11 +3502,7 @@ function renderManagement() {
     button.setAttribute("aria-pressed", String(active));
   });
 
-  managerStats.innerHTML = `
-    <article class="stat-tile"><strong>${state.groups.length}</strong><span>groepen</span></article>
-    <article class="stat-tile"><strong>${kidCount}</strong><span>kinderen</span></article>
-    <article class="stat-tile"><strong>${state.leaders.length + state.managers.length}</strong><span>mensen</span></article>
-  `;
+  renderManagerOverviewDashboard(kidCount);
 
   leadersList.innerHTML = state.leaders
     .map((leader) => `
@@ -3079,7 +3597,9 @@ function renderManagement() {
 function renderFeedback() {
   const visibleFeedback = isManager()
     ? state.feedback
-    : state.feedback.filter((entry) => entry.userKey === userKey(state.currentUser) || entry.userName === currentUserName());
+    : state.feedback.filter((entry) => (
+      entry.userKey === userKey(state.currentUser) || feedbackBelongsToCurrentLeadersGroup(entry)
+    ));
 
   feedbackList.innerHTML = visibleFeedback
     .slice()
@@ -3090,18 +3610,88 @@ function renderFeedback() {
           <strong>${escapeHTML(feedbackCategoryLabel(entry.category))}</strong>
           <span>${escapeHTML(entry.userName)}</span>
           <span>${escapeHTML(roleLabel(entry.role))}</span>
-          <span>${escapeHTML(entry.groupName || "Alle groepen")}</span>
+          ${entry.groupName && feedbackAuthorHasAssignedGroup(entry) ? `<span>${escapeHTML(entry.groupName)}</span>` : ""}
           <span>${escapeHTML(entry.createdAt)}</span>
         </div>
         <p>${escapeHTML(entry.text)}</p>
+        ${renderFeedbackReactions(entry)}
         ${isManager() ? `<button class="text-button" type="button" data-remove-feedback="${escapeAttribute(entry.id)}">Verwijderen</button>` : ""}
       </article>
     `)
     .join("");
 
   if (!visibleFeedback.length) {
-    feedbackList.innerHTML = `<article class="feedback-entry"><p>${isManager() ? "Nog geen evaluatie ingediend." : "Je hebt nog geen evaluatie ingediend."}</p></article>`;
+    feedbackList.innerHTML = `<article class="feedback-entry"><p>${isManager() ? "Nog geen evaluatie ingediend." : "Nog geen evaluaties voor jouw groep ingediend."}</p></article>`;
   }
+}
+
+function feedbackBelongsToCurrentLeadersGroup(entry) {
+  if (!feedbackAuthorHasAssignedGroup(entry)) return false;
+  const assignedGroups = visibleGroupsFor();
+  return assignedGroups.some((group) => (
+    entry.groupId === group.id || (!entry.groupId && entry.groupName === group.name)
+  ));
+}
+
+function feedbackAuthorHasAssignedGroup(entry) {
+  if (!entry.userKey?.startsWith("leader:")) return true;
+  const leaderId = entry.userKey.slice("leader:".length);
+  return state.groups.some((group) => group.leaderIds.includes(leaderId));
+}
+
+function feedbackGroupForCurrentUser() {
+  if (isManager()) return activeGroup();
+  const assignedGroups = visibleGroupsFor();
+  return assignedGroups.find((group) => group.id === state.activeGroupId) || assignedGroups[0] || null;
+}
+
+function canReactToFeedback(entry) {
+  return !isManager()
+    && entry.userKey !== userKey(state.currentUser)
+    && feedbackBelongsToCurrentLeadersGroup(entry);
+}
+
+function renderFeedbackReactions(entry) {
+  const reactions = entry.reactions || {};
+  const currentReaction = reactions[userKey(state.currentUser)] || "";
+  const upCount = Object.values(reactions).filter((reaction) => reaction === "up").length;
+  const downCount = Object.values(reactions).filter((reaction) => reaction === "down").length;
+
+  if (!canReactToFeedback(entry) && !upCount && !downCount) return "";
+
+  return `
+    <div class="feedback-reactions" aria-label="Waarderingen">
+      <span class="feedback-reactions-label">${upCount + downCount ? "Waarderingen" : "Jouw reactie"}</span>
+      ${canReactToFeedback(entry) ? `
+        <button
+          class="feedback-reaction-button ${currentReaction === "up" ? "selected up" : ""}"
+          type="button"
+          data-feedback-reaction="up"
+          data-feedback-id="${escapeAttribute(entry.id)}"
+          aria-label="Duimpje omhoog"
+          aria-pressed="${currentReaction === "up"}"
+          title="Duimpje omhoog"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10v10H4V10h3Zm3 10h7.2a2 2 0 0 0 1.94-1.5l1.43-5.5A2 2 0 0 0 18.63 10H15l.7-3.17A2.8 2.8 0 0 0 13 3.4L10 10v10Z" /></svg>
+          <span>${upCount}</span>
+        </button>
+      ` : (upCount ? `<span class="feedback-reaction-count up"><span aria-hidden="true">&#128077;</span>${upCount}</span>` : "")}
+      ${canReactToFeedback(entry) ? `
+        <button
+          class="feedback-reaction-button ${currentReaction === "down" ? "selected down" : ""}"
+          type="button"
+          data-feedback-reaction="down"
+          data-feedback-id="${escapeAttribute(entry.id)}"
+          aria-label="Duimpje omlaag"
+          aria-pressed="${currentReaction === "down"}"
+          title="Duimpje omlaag"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v10H4V4h3Zm3 0h7.2a2 2 0 0 1 1.94 1.5l1.43 5.5A2 2 0 0 1 18.63 14H15l.7 3.17A2.8 2.8 0 0 1 13 20.6L10 14V4Z" /></svg>
+          <span>${downCount}</span>
+        </button>
+      ` : (downCount ? `<span class="feedback-reaction-count down"><span aria-hidden="true">&#128078;</span>${downCount}</span>` : "")}
+    </div>
+  `;
 }
 
 function renderImportantInfo() {
@@ -3133,6 +3723,166 @@ function renderImportantInfo() {
   if (!state.importantInfo.length) {
     importantInfoList.innerHTML = `<article class="important-info-entry"><p>Nog geen belangrijke info geplaatst.</p></article>`;
   }
+}
+
+function renderGeneralAgreements() {
+  const sortedAgreements = builtInGeneralAgreements
+    .slice()
+    .sort((first, second) => first.order - second.order || first.title.localeCompare(second.title, "nl"));
+  agreementsList.innerHTML = agreementCategories.map((category) => {
+    const entries = sortedAgreements.filter((entry) => entry.category === category.id);
+    if (!entries.length) return "";
+
+    return `
+      <section class="agreement-group category-${category.id}" aria-labelledby="agreement-group-${category.id}">
+        <header class="agreement-group-header">
+          <h3 id="agreement-group-${category.id}">${escapeHTML(category.label)}</h3>
+          <span>${entries.length} ${entries.length === 1 ? "afspraak" : "afspraken"}</span>
+        </header>
+        <div class="agreement-group-entries">
+          ${entries.map((entry) => {
+            const isOpen = openAgreementId === entry.id;
+            const notice = entry.notice
+              ? `<div class="agreement-notice ${entry.notice.level}" role="note"><strong>${entry.notice.level === "critical" ? "Direct belangrijk" : "Let op"}</strong><span>${escapeHTML(entry.notice.text)}</span></div>`
+              : "";
+
+            return `
+              <article class="agreement-entry ${isOpen ? "open" : ""}">
+                <button class="agreement-toggle" type="button" data-toggle-agreement="${escapeAttribute(entry.id)}" aria-expanded="${isOpen}" aria-controls="agreement-detail-${escapeAttribute(entry.id)}">
+                  <span class="agreement-number" aria-hidden="true">${entry.order}</span>
+                  <span class="agreement-heading">
+                    <strong>${escapeHTML(entry.title)}</strong>
+                    <span>${escapeHTML(entry.summary)}</span>
+                  </span>
+                  <svg class="agreement-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4" /></svg>
+                </button>
+                <div class="agreement-detail ${isOpen ? "" : "hidden"}" id="agreement-detail-${escapeAttribute(entry.id)}">
+                  ${notice}
+                  <p>${escapeHTML(entry.text)}</p>
+                </div>
+              </article>
+            `;
+          }).join("")}
+        </div>
+      </section>
+    `;
+  }).join("");
+}
+
+function boardInitials(name) {
+  return String(name || "?")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase() || "?";
+}
+
+function whatsappNumber(value) {
+  let digits = String(value || "").replace(/\D/g, "");
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  if (digits.startsWith("0")) digits = `31${digits.slice(1)}`;
+  return digits.length >= 8 && digits.length <= 15 ? digits : "";
+}
+
+const boardDisplayOrder = ["naomi", "jeroen", "nanne", "peter", "rob", "ties", "joy"];
+
+function boardFirstName(person) {
+  return String(person?.name || "").trim().split(/\s+/)[0].toLowerCase();
+}
+
+function orderedBoardMembers() {
+  return state.managers.slice().sort((first, second) => {
+    const firstOrder = boardDisplayOrder.indexOf(boardFirstName(first));
+    const secondOrder = boardDisplayOrder.indexOf(boardFirstName(second));
+    const firstRank = firstOrder === -1 ? Number.MAX_SAFE_INTEGER : firstOrder;
+    const secondRank = secondOrder === -1 ? Number.MAX_SAFE_INTEGER : secondOrder;
+    if (firstRank !== secondRank) return firstRank - secondRank;
+    return first.name.localeCompare(second.name, "nl");
+  });
+}
+
+function renderBoardCard(person) {
+  const number = whatsappNumber(person.phone);
+  const avatar = person.photo
+    ? `<img src="${escapeAttribute(person.photo)}" alt="Foto van ${escapeAttribute(person.name)}" />`
+    : `<span aria-hidden="true">${escapeHTML(boardInitials(person.name))}</span>`;
+  const contactActions = number
+    ? `<div class="board-contact-actions">
+        <a class="board-contact-button board-whatsapp" href="https://wa.me/${number}" target="_blank" rel="noopener noreferrer" aria-label="Stuur ${escapeAttribute(person.name)} een WhatsApp-bericht">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 11.8a8.5 8.5 0 0 1-12.6 7.4L3 20.5l1.3-4.7A8.5 8.5 0 1 1 20.5 11.8Z" /><path d="M8.1 7.8c.2-.4.4-.4.7-.4h.5c.2 0 .4.1.5.4l.8 1.9c.1.3 0 .5-.2.7l-.6.7c-.2.2-.1.4 0 .6.7 1.3 1.8 2.4 3.2 3 .2.1.4.1.6-.1l.8-1c.2-.2.4-.3.7-.2l1.9.9c.3.1.4.3.4.5 0 .5-.2 1.4-.8 1.9-.6.6-1.5.9-2.4.7-1.1-.2-2.6-.7-4.2-2.1-1.3-1.1-2.3-2.5-2.8-3.6-.5-1.1-.5-2.2-.2-2.9.2-.5.7-.9 1.1-1Z" /></svg>
+          <span>WhatsApp</span>
+        </a>
+        <a class="board-contact-button board-call" href="tel:+${number}" aria-label="Bel ${escapeAttribute(person.name)}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .7 2.9a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.9.6 2.9.7a2 2 0 0 1 1.7 2Z" /></svg>
+          <span>Bellen</span>
+        </a>
+      </div>`
+    : "";
+
+  return `
+    <article class="board-card">
+      <div class="board-avatar">${avatar}</div>
+      <div class="board-card-copy">
+        <small>${escapeHTML(person.boardRole || "Bestuurslid")}</small>
+        <h3>${escapeHTML(person.name)}</h3>
+        <p>${escapeHTML(person.intro || "Binnenkort lees je hier meer over dit bestuurslid.")}</p>
+      </div>
+      ${contactActions}
+    </article>
+  `;
+}
+
+function renderBoardProfiles() {
+  const boardMembers = orderedBoardMembers();
+  boardGrid.innerHTML = `
+    <section class="board-section" aria-labelledby="board-members-heading">
+      <h3 id="board-members-heading">Bestuur</h3>
+      <div class="board-section-grid">
+        ${boardMembers.length ? boardMembers.map(renderBoardCard).join("") : `<p class="board-empty">Er zijn nog geen bestuursleden toegevoegd.</p>`}
+      </div>
+    </section>
+    <section class="board-section" aria-labelledby="board-support-heading">
+      <h3 id="board-support-heading">Ondersteuning</h3>
+      <div class="board-section-grid">${state.supportProfiles.map(renderBoardCard).join("")}</div>
+    </section>
+  `;
+
+  boardProfileEditor.innerHTML = [
+    ...orderedBoardMembers().map((manager) => renderBoardProfileForm(manager, "manager")),
+    ...state.supportProfiles.map((profile) => renderBoardProfileForm(profile, "support"))
+  ].join("");
+}
+
+function renderBoardProfileForm(person, kind) {
+  const profileLabel = kind === "support" ? "Ondersteuning" : "Bestuur";
+  return `
+    <form class="board-profile-form" data-board-profile="${escapeAttribute(person.id)}" data-board-profile-kind="${kind}">
+      <div class="board-profile-form-header">
+        <div class="board-avatar small">
+          ${person.photo ? `<img src="${escapeAttribute(person.photo)}" alt="" />` : `<span aria-hidden="true">${escapeHTML(boardInitials(person.name))}</span>`}
+        </div>
+        <div><strong>${escapeHTML(person.name)}</strong><small>${profileLabel}</small></div>
+      </div>
+      <label>Functie
+        <input name="boardRole" type="text" maxlength="80" value="${escapeAttribute(person.boardRole || (kind === "support" ? "Ondersteuning" : "Bestuurslid"))}" placeholder="Bijvoorbeeld voorzitter" />
+      </label>
+      <label>Korte introductie
+        <textarea name="intro" rows="3" maxlength="280" placeholder="Vertel kort waarvoor mensen bij jou terechtkunnen">${escapeHTML(person.intro || "")}</textarea>
+      </label>
+      <label>Mobiel nummer
+        <input name="phone" type="tel" value="${escapeAttribute(person.phone || "")}" placeholder="06 12 34 56 78" autocomplete="tel" />
+      </label>
+      <label>Profielfoto
+        <input name="photo" type="file" accept="image/jpeg,image/png,image/webp" />
+      </label>
+      <div class="board-profile-actions">
+        ${person.photo ? `<button class="text-button" type="button" data-remove-board-photo="${escapeAttribute(person.id)}" data-board-profile-kind="${kind}">Foto verwijderen</button>` : ""}
+        <button type="submit">Profiel opslaan</button>
+      </div>
+    </form>
+  `;
 }
 
 function setupProgress() {
@@ -3253,6 +4003,70 @@ function roleLabel(role) {
   return labels[role] || role;
 }
 
+function instructionCategoryLabel(category) {
+  const labels = {
+    kleuters: "Kleuters",
+    pupillen: "Pupillen",
+    jongeren: "Jongeren",
+    ouderen: "Ouderen",
+    "all-groups": "Alle groepen"
+  };
+  return labels[category] || "Alle groepen";
+}
+
+function scheduleActivitySlug(value) {
+  return String(value)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 72) || "activiteit";
+}
+
+function buildScheduleActivityIndex(programs) {
+  const index = new Map();
+  const usedIds = new Set();
+
+  Object.entries(programs).forEach(([category, days]) => {
+    days.forEach((items, dayIndex) => {
+      items.forEach((item) => {
+        const baseId = item.activityId || [
+          "programma",
+          category,
+          dayIndex + 1,
+          item.time.replace(":", ""),
+          scheduleActivitySlug(item.title)
+        ].join("-");
+        let activityId = baseId;
+        let duplicate = 2;
+        while (usedIds.has(activityId)) {
+          activityId = `${baseId}-${duplicate}`;
+          duplicate += 1;
+        }
+        usedIds.add(activityId);
+        item.activityId = activityId;
+        index.set(activityId, {
+          id: activityId,
+          category,
+          dayIndex,
+          time: item.time,
+          title: item.title
+        });
+      });
+    });
+  });
+
+  return index;
+}
+
+function scheduleActivityLabel(activityId) {
+  const activity = scheduleActivityIndex.get(activityId);
+  if (!activity) return "Niet meer gevonden in het programma";
+  const day = scheduleDays[activity.dayIndex];
+  return `${instructionCategoryLabel(activity.category)} · ${day?.label || "Dag"} ${activity.time} · ${activity.title}`;
+}
+
 function groupScheduleItems(items) {
   return items.reduce((groups, item) => {
     const current = groups[groups.length - 1];
@@ -3265,52 +4079,290 @@ function groupScheduleItems(items) {
   }, []);
 }
 
+const scheduleActivityTypes = {
+  general: { className: "general", label: "Algemeen" },
+  logistics: { className: "logistics", label: "Logistiek" },
+  food: { className: "food", label: "Eten & pauze" },
+  meal: { className: "food", label: "Eten & pauze" },
+  creative: { className: "creative", label: "Creatief" },
+  sport: { className: "sport", label: "Sport & beweging" },
+  active: { className: "sport", label: "Sport & beweging" },
+  game: { className: "game", label: "Spel & opdracht" },
+  show: { className: "show", label: "Show & media" },
+  outing: { className: "outing", label: "Uitje & extern" },
+  camp: { className: "camp", label: "Kamp & nacht" },
+  rest: { className: "general", label: "Algemeen" }
+};
+
+function scheduleActivityType(item) {
+  const title = item.title.toLowerCase();
+  const matches = (patterns) => patterns.some((pattern) => pattern.test(title));
+
+  if (matches([/eventueel omkleden/, /omkleden vanwege/])) return "logistics";
+  if (matches([/feestrace/, /bingo/, /oud.?hollandse spellen/, /moordmysterie/])) return "game";
+  if (matches([/film/, /theater/, /meeleef/, /podium/, /afsluiting/, /catwalk/])) return "show";
+  if (matches([/stormbaan/, /trefbal/, /zeskamp/, /volleybal/, /smokkelspel/, /zwemmer, redder/, /waterpret/])) return "sport";
+  if (matches([/knutsel/, /kleurplaat/, /tekenen/, /vlaggenlijn/])) return "creative";
+  if (matches([/vossenjacht/, /spelletjes in de kloostertuin/, /starten met .vegen/])) return "outing";
+  if (matches([/traktatie/, /ranjapauze/])) return "food";
+  if (matches([/aankomst/, /verzamelen bij/, /lopen naar/, /terugfietsen/, /hulpleiding naar huis/, /inleveren formulieren/])) return "logistics";
+
+  return scheduleActivityTypes[item.type] ? item.type : "general";
+}
+
 function scheduleActivityMeta(item) {
-  const text = `${item.title} ${item.detail}`.toLowerCase();
-  const matches = (patterns) => patterns.some((pattern) => pattern.test(text));
+  return scheduleActivityTypes[scheduleActivityType(item)] || scheduleActivityTypes.general;
+}
 
-  if (matches([/spook/, /kamp/, /slaapplek/, /luchtbed/, /wakker worden/, /wassen/, /gotcha/])) {
-    return { className: "camp", label: "Kamp / avond" };
+function scheduleParallelMeta(items) {
+  const metas = items.map(scheduleActivityMeta);
+  if (metas.every((meta) => meta.className === metas[0].className)) return metas[0];
+  return { className: "game", label: "Parallelle activiteiten" };
+}
+
+function scheduleRotationKey(item) {
+  return item.rotation.id;
+}
+
+function scheduleRotationState(item) {
+  const key = scheduleRotationKey(item);
+  if (!scheduleRotationUI.has(key)) {
+    scheduleRotationUI.set(key, {
+      expanded: false,
+      round: item.rotation.rounds?.[0]?.time || "",
+      group: ""
+    });
   }
+  return scheduleRotationUI.get(key);
+}
 
-  if (matches([/fruit/, /lunch/, /ranja/, /plaspauze/, /ontbijt/, /friet/, /snack/, /koek/, /snoep/, /pauze/, /drinken/])) {
-    return { className: "food", label: "Eten & pauze" };
-  }
+function rotationGroupsLabel(groups) {
+  return groups.replace(/\s+vs\s+/i, " tegen ");
+}
 
-  if (matches([/leiding aanwezig/, /kinderen aanwezig/, /bussen/, /instappen/, /aankomst/, /verzamelen/, /terugrijden/, /terugfietsen/, /kinderen naar huis/, /schoonmaken/, /evalueren/, /wisselen/, /opruimen/, /vertrek/, /lopen naar/, /teruglopen/, /fietsen naar/, /richting de stad/])) {
-    return { className: "logistics", label: "Logistiek" };
-  }
+function rotationGroupMembers(groups) {
+  return groups.split(/\s+vs\s+/i).map((group) => group.trim());
+}
 
-  if (matches([/toverland/, /kloostertuin/, /stadspark/, /kapel/, /wijk/, /heukelom/, /extern/])) {
-    return { className: "outing", label: "Uitje / extern" };
-  }
+function rotationGroupDisplayName(group) {
+  return /^(groep|kleuters|pupillen|jongeren|ouderen)\s/i.test(group) ? group : `Groep ${group}`;
+}
 
-  if (matches([/knutsel/, /kleurplaat/, /tekenen/, /muts/, /slinger/, /vlaggenlijn/])) {
-    return { className: "creative", label: "Creatief" };
-  }
+function renderScheduleRotation(item, isParallel = false, activityIndex = 0) {
+  const key = scheduleRotationKey(item);
+  const ui = scheduleRotationState(item);
+  const { rotation } = item;
+  const rounds = rotation.rounds || [];
+  const isFreeFlow = rotation.mode === "free";
+  const isMatchRotation = rotation.mode === "matches";
+  const isTimeline = rotation.mode === "timeline";
+  const isGroupRoutes = rotation.mode === "groupRoutes";
+  const selectedRound = rounds.find((round) => round.time === ui.round) || rounds[0];
+  const stations = rotation.stations || rounds[0]?.assignments.map((assignment) => assignment.station) || [];
+  const stationLocations = rotation.stationLocations || {};
+  const activityMeta = rotation.className
+    ? { className: rotation.className }
+    : scheduleActivityMeta(item);
+  const rotationSummary = rotation.summary
+    || `${stations.length} spellen · ${isFreeFlow ? "vrije volgorde" : `${rounds.length} rondes`}`;
+  const toggleLabel = isFreeFlow ? "spellen" : isTimeline ? "schema" : isGroupRoutes ? "routes" : "indeling";
+  const route = ui.group && !isFreeFlow
+    ? rounds.map((round) => {
+        const assignment = round.assignments.find((entry) => rotationGroupMembers(entry.groups).includes(ui.group));
+        const partner = assignment
+          ? rotationGroupMembers(assignment.groups).find((group) => group !== ui.group)
+          : "";
+        return { time: round.label || round.time, assignment, partner };
+      })
+    : [];
 
-  if (matches([/lasergam/, /imposter/, /moordmysterie/, /crazy 88/, /ruilspel/, /contact/, /dirigent/, /quiz/])) {
-    return { className: "game", label: "Game / opdracht" };
-  }
+  return `
+    <div class="schedule-event schedule-rotation-event ${activityMeta.className} ${isParallel ? "parallel" : ""} ${ui.expanded ? "expanded" : ""}">
+      <div class="rotation-summary">
+        <div class="rotation-summary-copy">
+          ${isParallel ? `<span class="parallel-index">Activiteit ${activityIndex + 1}</span>` : ""}
+          <strong>${escapeHTML(item.title)}</strong>
+          <span>${escapeHTML(rotation.location)} · ${escapeHTML(rotationSummary)}</span>
+        </div>
+        <div class="rotation-summary-actions">
+          ${renderRanjaInfoButton(item)}
+          ${renderInstructionLinkButton(item)}
+          <button
+            class="rotation-toggle"
+            type="button"
+            data-schedule-interactive
+            data-rotation-toggle="${escapeAttribute(key)}"
+            aria-expanded="${ui.expanded}"
+          >
+            <span>${ui.expanded ? `Verberg ${toggleLabel}` : `Bekijk ${toggleLabel}`}</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m7 10 5 5 5-5"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+      ${ui.expanded ? `
+        <div class="rotation-details">
+          ${item.detail ? `<p class="rotation-intro">${escapeHTML(item.detail)}</p>` : ""}
+          ${isFreeFlow ? `
+            <div class="rotation-participants">
+              <span>Voor</span>
+              <strong>${escapeHTML(rotation.groups.join(" en "))}</strong>
+            </div>
+            <div class="rotation-station-list" aria-label="Spellen van de Feestrace">
+              ${stations.map((station, index) => `
+                <div class="rotation-station">
+                  <span class="rotation-station-number">${index + 1}</span>
+                  <strong>${escapeHTML(station)}</strong>
+                </div>
+              `).join("")}
+            </div>
+          ` : isTimeline ? `
+            <div class="rotation-timeline" aria-label="${escapeAttribute(item.title)} schema">
+              ${rotation.steps.map((step) => `
+                <div class="rotation-timeline-step">
+                  <time>${escapeHTML(step.time)}</time>
+                  <div>
+                    <div class="rotation-step-title">
+                      <strong>${escapeHTML(step.title)}</strong>
+                      ${renderRanjaInfoButton(step)}
+                    </div>
+                    ${step.detail ? `<span>${escapeHTML(step.detail)}</span>` : ""}
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+          ` : isGroupRoutes ? `
+            <label class="rotation-group-control">
+              <span>Mijn groep</span>
+              <select
+                data-schedule-interactive
+                data-rotation-group="${escapeAttribute(key)}"
+              >
+                <option value="">Alle groepen</option>
+                ${rotation.groups.map((group) => `
+                  <option value="${escapeAttribute(group)}" ${ui.group === group ? "selected" : ""}>${escapeHTML(rotationGroupDisplayName(group))}</option>
+                `).join("")}
+              </select>
+            </label>
+            <div class="group-route-overview ${ui.group ? "single-route" : ""}">
+              ${rotation.groups
+                .filter((group) => !ui.group || group === ui.group)
+                .map((group) => `
+                  <section class="group-route-column" aria-label="Route ${escapeAttribute(rotationGroupDisplayName(group))}">
+                    <h3>${escapeHTML(rotationGroupDisplayName(group))}</h3>
+                    ${rotation.routes[group].map((step) => `
+                      <div class="group-route-step">
+                        <time>${escapeHTML(step.time)}</time>
+                        <div>
+                          <div class="rotation-step-title">
+                            <strong>${escapeHTML(step.title)}</strong>
+                            ${renderRanjaInfoButton(step)}
+                          </div>
+                          ${step.detail ? `<span>${escapeHTML(step.detail)}</span>` : ""}
+                        </div>
+                      </div>
+                    `).join("")}
+                  </section>
+                `).join("")}
+            </div>
+          ` : `
+            <label class="rotation-group-control">
+              <span>Mijn groep</span>
+              <select
+                data-schedule-interactive
+                data-rotation-group="${escapeAttribute(key)}"
+              >
+                <option value="">Alle groepen</option>
+                ${rotation.groups.map((group) => `
+                  <option value="${escapeAttribute(group)}" ${ui.group === group ? "selected" : ""}>${escapeHTML(rotationGroupDisplayName(group))}</option>
+                `).join("")}
+              </select>
+            </label>
 
-  if (matches([/theater/, /meeleef/, /film/, /carnaval/, /feest/, /podium/, /afsluiting/])) {
-    return { className: "show", label: "Feest / show" };
-  }
+            ${ui.group ? `
+            <div class="rotation-route" aria-label="Route voor ${escapeAttribute(rotationGroupDisplayName(ui.group))}">
+              <h3>Route ${escapeHTML(rotationGroupDisplayName(ui.group))}</h3>
+              ${route.map(({ time, assignment, partner }) => `
+                <div class="rotation-route-row">
+                  <time>${escapeHTML(time)}</time>
+                  <div class="rotation-assignment-copy">
+                    <strong>${escapeHTML(assignment?.station || rotation.idleLabel || "Geen indeling")}</strong>
+                    ${assignment && stationLocations[assignment.station] ? `<small>${escapeHTML(stationLocations[assignment.station])}</small>` : ""}
+                  </div>
+                  <span>${partner ? (isMatchRotation ? `tegen ${escapeHTML(rotationGroupDisplayName(partner))}` : `met groep ${escapeHTML(partner)}`) : ""}</span>
+                </div>
+              `).join("")}
+            </div>
+            ` : `
+              <div class="rotation-round-switch" role="group" aria-label="Kies een ronde">
+                ${rounds.map((round) => `
+                  <button
+                    type="button"
+                    data-schedule-interactive
+                    data-rotation-key="${escapeAttribute(key)}"
+                    data-rotation-round="${escapeAttribute(round.time)}"
+                    aria-pressed="${selectedRound?.time === round.time}"
+                    class="${selectedRound?.time === round.time ? "active" : ""}"
+                  >${escapeHTML(round.label || round.time)}</button>
+                `).join("")}
+              </div>
 
-  if (matches([/stormbaan/, /sport/, /tik/, /trefbal/, /race/, /zeskamp/, /waterpret/, /kwalleballen/, /spelletjes/, /spel –/, /levend stratego/])) {
-    return { className: "sport", label: "Sport & spel" };
-  }
+              <div class="rotation-mobile-round">
+                ${selectedRound?.assignments.map((assignment) => `
+                  <div class="rotation-assignment">
+                    <div class="rotation-assignment-copy">
+                      <strong>${escapeHTML(assignment.station)}</strong>
+                      ${stationLocations[assignment.station] ? `<small>${escapeHTML(stationLocations[assignment.station])}</small>` : ""}
+                    </div>
+                    <span>${escapeHTML(rotationGroupsLabel(assignment.groups))}</span>
+                  </div>
+                `).join("") || ""}
+              </div>
 
-  return { className: "general", label: "Activiteit" };
+              <div class="rotation-matrix-wrap">
+                <table class="rotation-matrix">
+                  <thead>
+                    <tr>
+                      <th scope="col">Tijd</th>
+                      ${stations.map((station) => `
+                        <th scope="col">
+                          <span>${escapeHTML(station)}</span>
+                          ${stationLocations[station] ? `<small>${escapeHTML(stationLocations[station])}</small>` : ""}
+                        </th>
+                      `).join("")}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${rounds.map((round) => `
+                      <tr>
+                        <th scope="row">${escapeHTML(round.label || round.time)}</th>
+                        ${stations.map((station) => {
+                          const assignment = round.assignments.find((entry) => entry.station === station);
+                          return `<td>${escapeHTML(rotationGroupsLabel(assignment?.groups || "-"))}</td>`;
+                        }).join("")}
+                      </tr>
+                    `).join("")}
+                  </tbody>
+                </table>
+              </div>
+            `}
+          `}
+        </div>
+      ` : ""}
+    </div>
+  `;
 }
 
 function renderSchedule() {
   const day = scheduleDays[scheduleDayIndex];
-  scheduleDateLabel.textContent = `${day.label} ${day.date}`;
+  const theme = scheduleThemes[scheduleCategory]?.[scheduleDayIndex];
+  scheduleDateLabel.textContent = `${day.label} ${day.date}${theme ? ` · ${theme}` : ""}`;
   scheduleDayName.textContent = day.label;
   scheduleDayRange.textContent = day.date;
   prevScheduleDay.disabled = scheduleDayIndex === 0;
   nextScheduleDay.disabled = scheduleDayIndex === scheduleDays.length - 1;
+  toverlandHub.classList.toggle("hidden", scheduleDayIndex !== 1);
 
   scheduleCategorySwitch.innerHTML = scheduleCategories
     .map((category) => `
@@ -3324,24 +4376,37 @@ function renderSchedule() {
   const scheduleBlocks = groupScheduleItems(scheduleItems);
 
   scheduleBoard.innerHTML = scheduleBlocks
-    .map((block) => `
+    .map((block) => {
+      const parallelMeta = block.items.length > 1 ? scheduleParallelMeta(block.items) : null;
+      return `
       <article class="schedule-row ${block.items.length > 1 ? "parallel-row" : ""}">
         <time class="schedule-time">${block.time}</time>
         <div class="schedule-event-stack">
           ${block.items.length > 1 ? `<span class="parallel-badge">${block.items.length} activiteiten tegelijk</span>` : ""}
           ${block.items.map((item, index) => {
-            const meta = scheduleActivityMeta(item);
+            if (item.rotation) return renderScheduleRotation(item, block.items.length > 1, index);
+            const meta = parallelMeta || scheduleActivityMeta(item);
             return `
               <div class="schedule-event ${meta.className} ${block.items.length > 1 ? "parallel" : ""}">
                 ${block.items.length > 1 ? `<span class="parallel-index">Activiteit ${index + 1}</span>` : ""}
-                <strong>${escapeHTML(item.title)}</strong>
+                <div class="schedule-event-title-row">
+                  <strong>${escapeHTML(item.title)}</strong>
+                  <span class="schedule-event-title-actions">
+                    ${renderRanjaInfoButton(item)}
+                    ${renderInstructionLinkButton(item)}
+                  </span>
+                </div>
                 ${item.detail ? `<span>${escapeHTML(item.detail)}</span>` : ""}
+                ${renderScheduleRouteLink(item)}
+                ${renderToverlandArrivalTools(item)}
+                ${renderCleaningAssignment(item)}
               </div>
             `;
           }).join("")}
         </div>
       </article>
-    `)
+    `;
+    })
     .join("");
 
   if (!scheduleItems.length) {
@@ -3349,14 +4414,902 @@ function renderSchedule() {
   }
 }
 
+function renderToverlandArrivalTools(item) {
+  if (scheduleDayIndex !== 1 || !item.title.toLowerCase().includes("aankomst in toverland")) return "";
+
+  return `
+    <section class="toverland-arrival-tools" aria-label="Toverland diensten en instructies">
+      <div class="toverland-arrival-tools-heading">
+        <span>Direct na aankomst</span>
+        <strong>Diensten & instructies</strong>
+      </div>
+      <div class="toverland-arrival-resource-grid">
+        <button type="button" data-schedule-interactive data-toverland-resource="roster">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2v4M16 2v4M3 10h18" /><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M7 14h4M13 14h4M7 18h4M13 18h4" /></svg>
+          <span><strong>Dienstrooster</strong><small>Bekijk jouw dienst</small></span>
+        </button>
+        <button type="button" data-schedule-interactive data-toverland-resource="ranjapost">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h8l1 18H7Z" /><path d="M9 8h6M10 12h4" /></svg>
+          <span><strong>Ranjapost</strong><small>Instructiekaart</small></span>
+        </button>
+        <button type="button" data-schedule-interactive data-toverland-resource="meeting-point">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3" /><path d="M5 21v-2a7 7 0 0 1 14 0v2" /></svg>
+          <span><strong>Verzamelplek</strong><small>Instructiekaart</small></span>
+        </button>
+      </div>
+    </section>
+  `;
+}
+
+function normalizeCleaningGroupName(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function cleaningGroupForCurrentUser() {
+  if (isManager()) return activeGroup();
+  const assignedGroups = visibleGroupsFor();
+  return assignedGroups.find((group) => group.id === state.activeGroupId) || assignedGroups[0] || null;
+}
+
+function groupMatchesCleaningAssignment(groupName, assignmentGroup) {
+  const group = normalizeCleaningGroupName(groupName);
+  const assignment = normalizeCleaningGroupName(assignmentGroup);
+  if (group === assignment) return true;
+  if (assignment === "ouderen12") return group === "ouderen1" || group === "ouderen2";
+  return false;
+}
+
+function cleaningAssignmentsForGroup(group) {
+  if (!group) return [];
+  return (cleaningRosterByDay[scheduleDayIndex] || []).filter((assignment) => (
+    assignment.groups.some((groupName) => groupMatchesCleaningAssignment(group.name, groupName))
+  ));
+}
+
+function renderCleaningAssignment(item) {
+  if (!item.title.toLowerCase().includes("schoonmaken en evalueren")) return "";
+
+  const group = cleaningGroupForCurrentUser();
+  const assignments = cleaningAssignmentsForGroup(group);
+  const heading = isManager() ? "Schoonmaakrooster" : "Jouw schoonmaaktaak";
+  const message = !group
+    ? "Je bent niet aan een groep gekoppeld. Bekijk het volledige rooster."
+    : assignments.length
+      ? `${group.name} is vandaag ingedeeld.`
+      : `${group.name} heeft vandaag geen reguliere schoonmaaktaak.`;
+
+  return `
+    <section class="cleaning-assignment-card" aria-label="${escapeAttribute(heading)}">
+      <div class="cleaning-assignment-heading">
+        <span>Schoonmaakrooster</span>
+        <strong>${escapeHTML(heading)}</strong>
+      </div>
+      <p>${escapeHTML(message)}</p>
+      ${assignments.length ? `
+        <ul>
+          ${assignments.map((assignment) => `<li>${escapeHTML(assignment.task)}</li>`).join("")}
+        </ul>
+      ` : ""}
+      <button type="button" data-schedule-interactive data-open-cleaning-roster>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2v4M16 2v4M3 10h18" /><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M7 14h4M13 14h4M7 18h4M13 18h4" /></svg>
+        <span>Volledig schoonmaakrooster</span>
+      </button>
+    </section>
+  `;
+}
+
+function openCleaningRoster(trigger) {
+  instructionViewerItems = [{
+    kind: "pdf",
+    url: cleaningRosterPdf,
+    name: "Schoonmaakrooster KVW 2026",
+    instruction: { title: "Schoonmaakrooster KVW 2026", summary: "", body: "", materials: "", safety: "" }
+  }];
+  instructionViewerIndex = 0;
+  instructionImageViewerReturnFocus = trigger;
+  renderInstructionViewerItem();
+  instructionImageViewer.classList.remove("hidden");
+  instructionImageViewer.setAttribute("aria-hidden", "false");
+  document.body.classList.add("instruction-viewer-open");
+  closeInstructionImageViewerButton.focus();
+}
+
+function renderScheduleRouteLink(item) {
+  if (!item.routeUrl) return "";
+  let routeUrl;
+  try {
+    const parsed = new URL(item.routeUrl);
+    if (parsed.protocol !== "https:") return "";
+    routeUrl = parsed.href;
+  } catch {
+    return "";
+  }
+
+  return `
+    <a
+      class="schedule-route-link"
+      href="${escapeAttribute(routeUrl)}"
+      target="_blank"
+      rel="noopener noreferrer"
+      data-schedule-interactive
+      aria-label="Open de fietsroute naar Heukelom in Google Maps"
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M9 18 4 20V6l5-2 6 2 5-2v14l-5 2-6-2Z" />
+        <path d="M9 4v14M15 6v14" />
+      </svg>
+      <span>Open fietsroute</span>
+      <svg class="schedule-route-external" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M14 5h5v5M19 5l-8 8" />
+        <path d="M19 13v6H5V5h6" />
+      </svg>
+    </a>
+  `;
+}
+
+function openToverlandResource(resourceKey, trigger) {
+  const resource = toverlandResources[resourceKey];
+  if (!resource) return;
+  instructionViewerItems = [{
+    ...resource,
+    name: resource.title,
+    instruction: { title: resource.title, summary: "", body: "", materials: "", safety: "" }
+  }];
+  instructionViewerIndex = 0;
+  instructionImageViewerReturnFocus = trigger;
+  renderInstructionViewerItem();
+  instructionImageViewer.classList.remove("hidden");
+  instructionImageViewer.setAttribute("aria-hidden", "false");
+  document.body.classList.add("instruction-viewer-open");
+  closeInstructionImageViewerButton.focus();
+}
+
+function toverlandAssignmentsFor(slot) {
+  return [
+    { label: "Ranjapost", names: slot.ranjapost, className: "" },
+    { label: "Verzamelplek", names: slot.meetingPoint, className: "meeting" }
+  ];
+}
+
+function renderToverlandRoster() {
+  const currentName = currentUserName().trim().toLowerCase();
+  document.querySelectorAll("[data-toverland-roster-mode]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.toverlandRosterMode === toverlandRosterMode);
+    button.setAttribute("aria-pressed", String(button.dataset.toverlandRosterMode === toverlandRosterMode));
+  });
+
+  const rows = toverlandRoster
+    .map((slot) => {
+      const assignments = toverlandAssignmentsFor(slot).filter((assignment) => (
+        toverlandRosterMode === "all"
+        || assignment.names.some((name) => name.toLowerCase() === currentName)
+      ));
+      return assignments.length ? { ...slot, assignments } : null;
+    })
+    .filter(Boolean);
+
+  if (!rows.length) {
+    toverlandRosterContent.innerHTML = `
+      <div class="toverland-roster-empty">
+        <strong>Je bent niet ingedeeld</strong>
+        <p>Er staat geen dienst op jouw naam. Bekijk het volledige rooster om te zien wie er wel is ingedeeld.</p>
+      </div>
+    `;
+    return;
+  }
+
+  toverlandRosterContent.innerHTML = rows.map((slot) => `
+    <article class="toverland-roster-row">
+      <time class="toverland-roster-time">${escapeHTML(slot.time)}</time>
+      <div class="toverland-roster-assignments">
+        ${slot.assignments.map((assignment) => `
+          <div class="toverland-roster-assignment ${assignment.className}">
+            <small>${assignment.label}</small>
+            <strong>${assignment.names.map(escapeHTML).join(" en ")}</strong>
+          </div>
+        `).join("")}
+      </div>
+    </article>
+  `).join("");
+}
+
+function openToverlandRoster(trigger) {
+  toverlandRosterMode = "mine";
+  toverlandRosterReturnFocus = trigger;
+  renderToverlandRoster();
+  toverlandRosterModal.classList.remove("hidden");
+  toverlandRosterModal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("toverland-roster-open");
+  closeToverlandRosterButton.focus();
+}
+
+function closeToverlandRoster() {
+  toverlandRosterModal.classList.add("hidden");
+  toverlandRosterModal.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("toverland-roster-open");
+  if (toverlandRosterReturnFocus?.isConnected) toverlandRosterReturnFocus.focus();
+  toverlandRosterReturnFocus = null;
+}
+
+function instructionsForActivity(activityId) {
+  return state.gameInstructions.filter((instruction) => instruction.activityIds.includes(activityId));
+}
+
+function renderInstructionLinkButton(item) {
+  const linkedInstructions = instructionsForActivity(item.activityId);
+  if (!linkedInstructions.length) return "";
+
+  return `
+    <button
+      class="schedule-instruction-button"
+      type="button"
+      data-schedule-interactive
+      data-open-activity-instructions="${escapeAttribute(item.activityId)}"
+      aria-label="Bekijk ${linkedInstructions.length === 1 ? "spelinstructie" : `${linkedInstructions.length} spelinstructies`} voor ${escapeAttribute(item.title)}"
+      title="Bekijk spelinstructie"
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M2 5.5A2.5 2.5 0 0 1 4.5 3H11v16H4.5A2.5 2.5 0 0 0 2 21.5Z" />
+        <path d="M22 5.5A2.5 2.5 0 0 0 19.5 3H13v16h6.5a2.5 2.5 0 0 1 2.5 2.5Z" />
+      </svg>
+      ${linkedInstructions.length > 1 ? `<span class="schedule-instruction-count">${linkedInstructions.length}</span>` : ""}
+    </button>
+  `;
+}
+
+function isRanjaPause(item) {
+  const title = item?.title || "";
+  return /ranja/i.test(title) && /pauze/i.test(title);
+}
+
+function renderRanjaInfoButton(item) {
+  if (!isRanjaPause(item)) return "";
+  return `
+    <button
+      class="schedule-info-button"
+      type="button"
+      data-schedule-interactive
+      data-open-ranja-info
+      aria-label="Bekijk afspraak bij deze ranjapauze"
+      title="Afspraak bij ranjapauze"
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 10v6M12 7h.01" />
+      </svg>
+    </button>
+  `;
+}
+
+function openRanjaInfo(trigger) {
+  instructionViewerItems = [{
+    kind: "text",
+    url: "",
+    name: "Ranjapauze",
+    instruction: {
+      title: "Ranjapauze",
+      summary: "Er staat ranja en een traktatie klaar bij de catering. Alleen (hulp)leiding kunnen deze ophalen! Ga niet met je groepje langs de catering, maar zoek een plek om je pauze door te brengen.",
+      body: "",
+      materials: "",
+      safety: ""
+    }
+  }];
+  instructionViewerIndex = 0;
+  instructionImageViewerReturnFocus = trigger;
+  renderInstructionViewerItem();
+  instructionImageViewer.classList.remove("hidden");
+  instructionImageViewer.setAttribute("aria-hidden", "false");
+  document.body.classList.add("instruction-viewer-open");
+  closeInstructionImageViewerButton.focus();
+}
+
+function visibleInstructions() {
+  const query = instructionSearch.value.trim().toLowerCase();
+  const category = instructionCategoryFilter.value;
+
+  return state.gameInstructions
+    .filter((instruction) => !instructionActivityFilter || instruction.activityIds.includes(instructionActivityFilter))
+    .filter((instruction) => category === "all" || instruction.category === category)
+    .filter((instruction) => {
+      if (!query) return true;
+      return [instruction.title, instruction.summary, instruction.body, instruction.materials]
+        .some((value) => value.toLowerCase().includes(query));
+    })
+    .slice()
+    .sort((a, b) => a.title.localeCompare(b.title, "nl"));
+}
+
+function safeInstructionFileUrl(value) {
+  const url = String(value || "");
+  if (/^data:(image\/(jpeg|png|webp|gif)|application\/pdf);base64,/i.test(url)) return url;
+  try {
+    const parsed = new URL(url, window.location.href);
+    if (["http:", "https:", "blob:"].includes(parsed.protocol)) return parsed.href;
+
+    if (window.location.protocol === "file:" && parsed.protocol === "file:") {
+      const bundledInstructionRoot = new URL("./assets/game-instructions/", window.location.href);
+      if (parsed.pathname.startsWith(bundledInstructionRoot.pathname)) return parsed.href;
+    }
+
+    return "#";
+  } catch {
+    return "#";
+  }
+}
+
+function loadRecentlyViewedInstructionIds() {
+  try {
+    const ids = JSON.parse(localStorage.getItem(recentInstructionsKey) || "[]");
+    return Array.isArray(ids) ? ids.filter((id) => typeof id === "string").slice(0, 6) : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberViewedInstructions(instructions) {
+  const viewedIds = instructions.map((instruction) => instruction?.id).filter(Boolean);
+  if (!viewedIds.length) return;
+  const recentIds = loadRecentlyViewedInstructionIds().filter((id) => !viewedIds.includes(id));
+  try {
+    localStorage.setItem(recentInstructionsKey, JSON.stringify([...viewedIds, ...recentIds].slice(0, 6)));
+  } catch {
+    // Recent bekeken is alleen een lokaal hulpmiddel; de viewer blijft zonder opslag werken.
+  }
+  if (state.activeView === "instructionLibraryView") renderPublicInstructionLibrary();
+}
+
+function publicInstructionFileLabel(instruction) {
+  const imageCount = instruction.attachments.filter((attachment) => attachment.type.startsWith("image/")).length;
+  const pdfCount = instruction.attachments.filter((attachment) => attachment.type === "application/pdf").length;
+  if (imageCount === instruction.attachments.length && imageCount) {
+    return `${imageCount} afbeelding${imageCount === 1 ? "" : "en"}`;
+  }
+  if (pdfCount === instruction.attachments.length && pdfCount) {
+    return `${pdfCount} PDF${pdfCount === 1 ? "" : "'s"}`;
+  }
+  if (instruction.attachments.length) {
+    return `${instruction.attachments.length} bestand${instruction.attachments.length === 1 ? "" : "en"}`;
+  }
+  return "Tekstinstructie";
+}
+
+function instructionHasViewableContent(instruction) {
+  const hasSupportedAttachment = instruction.attachments.some((attachment) => (
+    (attachment.type.startsWith("image/") || attachment.type === "application/pdf")
+    && safeInstructionFileUrl(attachment.url) !== "#"
+  ));
+  const hasText = [instruction.summary, instruction.body, instruction.materials, instruction.safety]
+    .some((value) => String(value || "").trim());
+  return hasSupportedAttachment || hasText;
+}
+
+function renderPublicInstructionThumbnail(instruction) {
+  const imageAttachment = instruction.attachments.find((attachment) => (
+    attachment.type.startsWith("image/") && safeInstructionFileUrl(attachment.url) !== "#"
+  ));
+  if (imageAttachment) {
+    return `<img src="${escapeAttribute(safeInstructionFileUrl(imageAttachment.url))}" alt="" />`;
+  }
+
+  const hasPdf = instruction.attachments.some((attachment) => attachment.type === "application/pdf");
+  return `
+    <span class="public-instruction-file-icon ${hasPdf ? "pdf" : "text"}" aria-hidden="true">
+      <svg viewBox="0 0 24 24">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+        <path d="M14 2v6h6M8 13h8M8 17h6" />
+      </svg>
+    </span>
+  `;
+}
+
+function renderPublicInstructionCard(instruction) {
+  return `
+    <button
+      class="public-instruction-card instruction-category-${escapeAttribute(instruction.category)}"
+      type="button"
+      data-public-instruction-id="${escapeAttribute(instruction.id)}"
+    >
+      <span class="public-instruction-thumbnail">${renderPublicInstructionThumbnail(instruction)}</span>
+      <span class="public-instruction-card-copy">
+        <strong>${escapeHTML(instruction.title)}</strong>
+        ${instruction.summary ? `<span>${escapeHTML(instruction.summary)}</span>` : ""}
+        <small>
+          <span>${escapeHTML(instructionCategoryLabel(instruction.category))}</span>
+          <span>${escapeHTML(publicInstructionFileLabel(instruction))}</span>
+        </small>
+      </span>
+      <svg class="public-instruction-card-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+    </button>
+  `;
+}
+
+function visiblePublicInstructions() {
+  const query = publicInstructionSearch.value.trim().toLowerCase();
+  return state.gameInstructions
+    .filter(instructionHasViewableContent)
+    .filter((instruction) => (
+      publicInstructionCategory === "all"
+      || instruction.category === "all-groups"
+      || instruction.category === publicInstructionCategory
+    ))
+    .filter((instruction) => {
+      if (!query) return true;
+      const activityLabels = instruction.activityIds.map(scheduleActivityLabel);
+      return [
+        instruction.title,
+        instruction.summary,
+        instruction.body,
+        instruction.materials,
+        instruction.safety,
+        ...activityLabels
+      ].some((value) => String(value || "").toLowerCase().includes(query));
+    })
+    .slice()
+    .sort((a, b) => a.title.localeCompare(b.title, "nl"));
+}
+
+function renderPublicInstructionSection(title, instructions, recent = false) {
+  if (!instructions.length) return "";
+  return `
+    <section class="public-instruction-section ${recent ? "recent" : ""}">
+      <h3>${escapeHTML(title)}</h3>
+      <div class="public-instruction-grid">
+        ${instructions.map(renderPublicInstructionCard).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderPublicInstructionLibrary() {
+  const filters = ["all", ...scheduleCategories];
+  publicInstructionFilters.innerHTML = filters.map((category) => `
+    <button
+      class="${category === publicInstructionCategory ? "active" : ""}"
+      type="button"
+      data-public-instruction-category="${escapeAttribute(category)}"
+      aria-pressed="${category === publicInstructionCategory}"
+    >
+      ${category === "all" ? "Alle" : escapeHTML(instructionCategoryLabel(category))}
+    </button>
+  `).join("");
+
+  const instructions = visiblePublicInstructions();
+  const showRecent = !publicInstructionSearch.value.trim() && publicInstructionCategory === "all";
+  const recentIds = showRecent ? loadRecentlyViewedInstructionIds() : [];
+  const recentInstructions = recentIds
+    .map((id) => instructions.find((instruction) => instruction.id === id))
+    .filter(Boolean)
+    .slice(0, 4);
+  const recentIdSet = new Set(recentInstructions.map((instruction) => instruction.id));
+  const remainingInstructions = showRecent
+    ? instructions.filter((instruction) => !recentIdSet.has(instruction.id))
+    : instructions;
+
+  publicInstructionCount.textContent = `${instructions.length} instructie${instructions.length === 1 ? "" : "s"}`;
+  publicInstructionResults.innerHTML = instructions.length
+    ? [
+        renderPublicInstructionSection("Recent bekeken", recentInstructions, true),
+        renderPublicInstructionSection(recentInstructions.length ? "Alle instructies" : "Instructies", remainingInstructions)
+      ].join("")
+    : `<div class="public-instruction-empty"><strong>Geen instructies gevonden</strong><span>Probeer een andere zoekterm of doelgroep.</span></div>`;
+}
+
+function formatFileSize(size) {
+  if (!size) return "";
+  if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} kB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function renderInstructionAttachment(attachment) {
+  const url = safeInstructionFileUrl(attachment.url);
+  const isImage = attachment.type.startsWith("image/");
+  return `
+    <article class="instruction-file ${isImage ? "image" : "pdf"}">
+      ${isImage ? `
+        <button class="instruction-file-content" type="button" data-view-instruction-image="${escapeAttribute(attachment.id)}" aria-label="Open ${escapeAttribute(attachment.name)} groot">
+          <img src="${escapeAttribute(url)}" alt="${escapeAttribute(attachment.name)}" />
+          <span>${escapeHTML(attachment.name)}${attachment.size ? ` · ${escapeHTML(formatFileSize(attachment.size))}` : ""}</span>
+        </button>
+      ` : `
+        <a class="instruction-file-content" href="${escapeAttribute(url)}" target="_blank" rel="noopener noreferrer">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" /><path d="M14 2v6h6M8 15h8M8 18h5" /></svg>
+          <span>${escapeHTML(attachment.name)}${attachment.size ? ` · ${escapeHTML(formatFileSize(attachment.size))}` : ""}</span>
+        </a>
+      `}
+      ${isManager() ? `
+        <button class="instruction-file-remove" type="button" data-remove-instruction-file="${escapeAttribute(attachment.id)}" aria-label="Verwijder ${escapeAttribute(attachment.name)}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+        </button>
+      ` : ""}
+    </article>
+  `;
+}
+
+function instructionActivityOptions(instruction) {
+  const items = schedulePrograms[instructionLinkCategory]?.[instructionLinkDayIndex] || [];
+  const available = items.filter((item) => !instruction.activityIds.includes(item.activityId));
+  if (!available.length) return `<option value="">Geen activiteiten beschikbaar</option>`;
+  return available
+    .map((item) => `<option value="${escapeAttribute(item.activityId)}">${escapeHTML(`${item.time} · ${item.title}`)}</option>`)
+    .join("");
+}
+
+function renderInstructionDetail(instruction) {
+  if (!instruction) {
+    return `
+      <div class="instruction-detail-empty">
+        <p>${isManager() ? "Nog geen spelinstructies. Voeg de eerste instructie toe." : "Nog geen spelinstructies beschikbaar."}</p>
+      </div>
+    `;
+  }
+
+  const activityLinks = instruction.activityIds.map((activityId) => ({
+    id: activityId,
+    label: scheduleActivityLabel(activityId)
+  }));
+
+  return `
+    <article class="instruction-detail-article instruction-category-${escapeAttribute(instruction.category)}">
+      <header class="instruction-detail-header">
+        <div>
+          <span class="instruction-category-pill">${escapeHTML(instructionCategoryLabel(instruction.category))}</span>
+          <h3>${escapeHTML(instruction.title)}</h3>
+          ${instruction.summary ? `<p class="instruction-summary">${escapeHTML(instruction.summary)}</p>` : ""}
+        </div>
+        ${isManager() ? `
+          <div class="instruction-detail-actions">
+            <button class="instruction-icon-button" type="button" data-edit-instruction="${escapeAttribute(instruction.id)}" aria-label="Bewerk ${escapeAttribute(instruction.title)}">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+            </button>
+            <button class="instruction-icon-button danger" type="button" data-delete-instruction="${escapeAttribute(instruction.id)}" aria-label="Verwijder ${escapeAttribute(instruction.title)}">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 16h10l1-16" /></svg>
+            </button>
+          </div>
+        ` : ""}
+      </header>
+
+      ${instruction.body ? `<section class="instruction-copy-section"><h4>Spelverloop</h4><p>${escapeHTML(instruction.body)}</p></section>` : ""}
+      ${instruction.materials ? `<section class="instruction-copy-section"><h4>Benodigdheden</h4><p>${escapeHTML(instruction.materials)}</p></section>` : ""}
+      ${instruction.safety ? `<section class="instruction-copy-section"><h4>Veiligheid</h4><p>${escapeHTML(instruction.safety)}</p></section>` : ""}
+
+      ${instruction.attachments.length ? `
+        <section class="instruction-files">
+          <h4>Bestanden</h4>
+          <div class="instruction-file-grid">${instruction.attachments.map(renderInstructionAttachment).join("")}</div>
+        </section>
+      ` : ""}
+
+      <section class="instruction-link-section">
+        <h4>Gekoppeld aan programma</h4>
+        <div class="instruction-links">
+          ${activityLinks.length
+            ? activityLinks.map((link) => `
+              <span class="instruction-link-chip">
+                <span>${escapeHTML(link.label)}</span>
+                ${isManager() ? `<button type="button" data-unlink-instruction-activity="${escapeAttribute(link.id)}" aria-label="Koppeling verwijderen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg></button>` : ""}
+              </span>
+            `).join("")
+            : `<span class="instruction-link-chip"><span>Nog niet gekoppeld</span></span>`}
+        </div>
+        ${isManager() ? `
+          <form class="instruction-link-form" id="instructionLinkForm">
+            <select data-instruction-link-category aria-label="Doelgroep">
+              ${scheduleCategories.map((category) => `<option value="${category}" ${category === instructionLinkCategory ? "selected" : ""}>${escapeHTML(instructionCategoryLabel(category))}</option>`).join("")}
+            </select>
+            <select data-instruction-link-day aria-label="Dag">
+              ${scheduleDays.map((day, index) => `<option value="${index}" ${index === instructionLinkDayIndex ? "selected" : ""}>${escapeHTML(day.label)}</option>`).join("")}
+            </select>
+            <select data-instruction-link-activity aria-label="Activiteit">${instructionActivityOptions(instruction)}</select>
+            <button type="submit">Koppelen</button>
+          </form>
+        ` : ""}
+      </section>
+    </article>
+  `;
+}
+
+function renderInstructions() {
+  const instructions = visibleInstructions();
+  if (!instructions.some((instruction) => instruction.id === activeInstructionId)) {
+    activeInstructionId = instructions[0]?.id || "";
+  }
+
+  instructionList.innerHTML = `
+    ${instructionActivityFilter ? `
+      <button class="text-button instruction-filter-clear" type="button" data-clear-instruction-activity-filter>
+        Toon volledige bibliotheek
+      </button>
+    ` : ""}
+    ${instructions.map((instruction) => `
+      <button
+        class="instruction-list-item instruction-category-${escapeAttribute(instruction.category)} ${instruction.id === activeInstructionId ? "active" : ""}"
+        type="button"
+        data-instruction-id="${escapeAttribute(instruction.id)}"
+      >
+        <strong>${escapeHTML(instruction.title)}</strong>
+        <span>${escapeHTML(instructionCategoryLabel(instruction.category))}</span>
+        <span class="instruction-list-meta">
+          <span>${instruction.attachments.length} bestand${instruction.attachments.length === 1 ? "" : "en"}</span>
+          <span>${instruction.activityIds.length} koppeling${instruction.activityIds.length === 1 ? "" : "en"}</span>
+        </span>
+      </button>
+    `).join("")}
+    ${!instructions.length ? `<div class="instruction-detail-empty"><p>Geen instructies gevonden.</p></div>` : ""}
+  `;
+
+  const activeInstruction = state.gameInstructions.find((instruction) => instruction.id === activeInstructionId);
+  instructionDetail.innerHTML = renderInstructionDetail(activeInstruction);
+}
+
+function openInstructionEditor(id = "") {
+  if (!isManager()) return;
+  const instruction = state.gameInstructions.find((item) => item.id === id);
+  instructionForm.reset();
+  instructionId.value = instruction?.id || "";
+  instructionTitle.value = instruction?.title || "";
+  instructionCategory.value = instruction?.category || "kleuters";
+  instructionSummary.value = instruction?.summary || "";
+  instructionBody.value = instruction?.body || "";
+  instructionMaterials.value = instruction?.materials || "";
+  instructionSafety.value = instruction?.safety || "";
+  instructionFormTitle.textContent = instruction ? "Instructie bewerken" : "Nieuwe instructie";
+  instructionUploadStatus.textContent = "";
+  instructionModal.classList.remove("hidden");
+  document.body.classList.add("instruction-modal-open");
+  instructionTitle.focus();
+}
+
+function closeInstructionEditor() {
+  instructionModal.classList.add("hidden");
+  document.body.classList.remove("instruction-modal-open");
+  instructionForm.reset();
+  instructionUploadStatus.textContent = "";
+}
+
+function instructionViewerEntries(instructions) {
+  return instructions.flatMap((instruction) => {
+    const attachments = instruction.attachments
+      .map((attachment) => {
+        const url = safeInstructionFileUrl(attachment.url);
+        if (url === "#") return null;
+        const kind = attachment.type.startsWith("image/")
+          ? "image"
+          : attachment.type === "application/pdf" ? "pdf" : "";
+        return kind ? { kind, url, name: attachment.name, instruction } : null;
+      })
+      .filter(Boolean);
+
+    if (attachments.length) return attachments;
+    if (![instruction.summary, instruction.body, instruction.materials, instruction.safety].some(Boolean)) return [];
+    return [{ kind: "text", url: "", name: instruction.title, instruction }];
+  });
+}
+
+function renderInstructionViewerItem() {
+  const item = instructionViewerItems[instructionViewerIndex];
+  if (!item) return;
+  const isImage = item.kind === "image";
+  const isPdf = item.kind === "pdf";
+  const isText = item.kind === "text";
+
+  instructionImageViewerImage.classList.toggle("hidden", !isImage);
+  instructionDocumentViewer.classList.toggle("hidden", !isPdf);
+  instructionTextViewer.classList.toggle("hidden", !isText);
+
+  if (isImage) {
+    instructionImageViewerImage.src = item.url;
+    instructionImageViewerImage.alt = item.name;
+  } else {
+    instructionImageViewerImage.removeAttribute("src");
+    instructionImageViewerImage.alt = "";
+  }
+
+  instructionDocumentViewer.src = isPdf ? item.url : "about:blank";
+
+  if (isText) {
+    const instruction = item.instruction;
+    instructionTextViewerTitle.textContent = instruction.title;
+    instructionTextViewerSummary.textContent = instruction.summary;
+    instructionTextViewerSummary.classList.toggle("hidden", !instruction.summary);
+    instructionTextViewerBody.replaceChildren();
+    [
+      ["Spelverloop", instruction.body],
+      ["Benodigdheden", instruction.materials],
+      ["Veiligheid", instruction.safety]
+    ].forEach(([label, value]) => {
+      if (!value) return;
+      const section = document.createElement("section");
+      const heading = document.createElement("h3");
+      const paragraph = document.createElement("p");
+      heading.textContent = label;
+      paragraph.textContent = value;
+      section.append(heading, paragraph);
+      instructionTextViewerBody.append(section);
+    });
+  }
+
+  instructionImageViewerCaption.textContent = item.name === item.instruction.title
+    ? item.instruction.title
+    : `${item.instruction.title} · ${item.name}`;
+  instructionImageViewerCount.textContent = instructionViewerItems.length > 1
+    ? `${instructionViewerIndex + 1} / ${instructionViewerItems.length}`
+    : "";
+  previousInstructionViewerItemButton.classList.toggle("hidden", instructionViewerItems.length < 2);
+  nextInstructionViewerItemButton.classList.toggle("hidden", instructionViewerItems.length < 2);
+}
+
+function openInstructionViewer(instructions, trigger = null) {
+  const items = instructionViewerEntries(instructions);
+  if (!items.length) {
+    showToast("Geen instructiebestand beschikbaar");
+    return;
+  }
+  rememberViewedInstructions(instructions);
+  instructionViewerItems = items;
+  instructionViewerIndex = 0;
+  instructionImageViewerReturnFocus = trigger;
+  renderInstructionViewerItem();
+  instructionImageViewer.classList.remove("hidden");
+  instructionImageViewer.setAttribute("aria-hidden", "false");
+  document.body.classList.add("instruction-viewer-open");
+  closeInstructionImageViewerButton.focus();
+}
+
+function openInstructionImageViewer(attachment, trigger = null) {
+  const instruction = state.gameInstructions.find((item) => item.id === activeInstructionId);
+  if (!instruction || !attachment) return;
+  openInstructionViewer([{ ...instruction, attachments: [attachment] }], trigger);
+}
+
+function moveInstructionViewer(direction) {
+  if (instructionViewerItems.length < 2) return;
+  instructionViewerIndex = (instructionViewerIndex + direction + instructionViewerItems.length) % instructionViewerItems.length;
+  renderInstructionViewerItem();
+}
+
+function closeInstructionImageViewer() {
+  instructionImageViewer.classList.add("hidden");
+  instructionImageViewer.setAttribute("aria-hidden", "true");
+  instructionImageViewerImage.removeAttribute("src");
+  instructionImageViewerImage.alt = "";
+  instructionDocumentViewer.src = "about:blank";
+  instructionImageViewerCaption.textContent = "";
+  instructionImageViewerCount.textContent = "";
+  instructionViewerItems = [];
+  instructionViewerIndex = 0;
+  document.body.classList.remove("instruction-viewer-open");
+  if (instructionImageViewerReturnFocus?.isConnected) instructionImageViewerReturnFocus.focus();
+  instructionImageViewerReturnFocus = null;
+}
+
+function openBoardGuide() {
+  if (!isManager()) {
+    showToast("Alleen voor bestuursleden");
+    return;
+  }
+  boardGuideReturnFocus = document.activeElement;
+  boardGuideFrame.src = "./assets/board/draaiboek-bestuur.pdf#view=FitH";
+  boardGuideViewer.classList.remove("hidden");
+  boardGuideViewer.setAttribute("aria-hidden", "false");
+  document.body.classList.add("board-guide-open");
+  closeBoardGuideButton.focus();
+}
+
+function closeBoardGuide() {
+  boardGuideViewer.classList.add("hidden");
+  boardGuideViewer.setAttribute("aria-hidden", "true");
+  boardGuideFrame.src = "about:blank";
+  document.body.classList.remove("board-guide-open");
+  if (boardGuideReturnFocus?.isConnected) boardGuideReturnFocus.focus();
+  boardGuideReturnFocus = null;
+}
+
+function instructionFileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(String(reader.result || "")));
+    reader.addEventListener("error", () => reject(new Error(`Kon ${file.name} niet lezen.`)));
+    reader.readAsDataURL(file);
+  });
+}
+
+function boardPhotoToDataUrl(file) {
+  if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+    return Promise.reject(new Error("Gebruik een JPG-, PNG- of WebP-afbeelding."));
+  }
+  if (file.size > 6 * 1024 * 1024) {
+    return Promise.reject(new Error("De profielfoto mag maximaal 6 MB zijn."));
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("error", () => reject(new Error("De profielfoto kon niet worden gelezen.")));
+    reader.addEventListener("load", () => {
+      const image = new Image();
+      image.addEventListener("error", () => reject(new Error("De profielfoto kon niet worden verwerkt.")));
+      image.addEventListener("load", () => {
+        const maxSize = 320;
+        const scale = Math.min(1, maxSize / Math.max(image.naturalWidth, image.naturalHeight));
+        const width = Math.max(1, Math.round(image.naturalWidth * scale));
+        const height = Math.max(1, Math.round(image.naturalHeight * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext("2d");
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, width, height);
+        context.drawImage(image, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
+      });
+      image.src = String(reader.result || "");
+    });
+    reader.readAsDataURL(file);
+  });
+}
+
+function safeInstructionFileName(name) {
+  const dotIndex = name.lastIndexOf(".");
+  const extension = dotIndex >= 0 ? name.slice(dotIndex).toLowerCase().replace(/[^a-z0-9.]/g, "") : "";
+  const base = scheduleActivitySlug(dotIndex >= 0 ? name.slice(0, dotIndex) : name).slice(0, 60);
+  return `${base || "bestand"}${extension}`;
+}
+
+async function uploadInstructionFile(instruction, file) {
+  const allowed = file.type === "application/pdf" || /^image\/(jpeg|png|webp|gif)$/.test(file.type);
+  if (!allowed) throw new Error(`${file.name}: alleen PDF, JPG, PNG, WebP of GIF.`);
+  if (file.size > instructionMaxFileSize) throw new Error(`${file.name}: maximaal 8 MB.`);
+
+  const attachmentId = `${instruction.id}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  if (databaseReady && databaseClient) {
+    const path = `${instruction.id}/${Date.now()}-${Math.random().toString(16).slice(2, 8)}-${safeInstructionFileName(file.name)}`;
+    const { error } = await databaseClient.storage
+      .from(instructionBucket)
+      .upload(path, file, { contentType: file.type, upsert: false });
+    if (error) throw new Error(`${file.name}: upload mislukt. Controleer de Supabase Storage-migratie.`);
+    const { data } = databaseClient.storage.from(instructionBucket).getPublicUrl(path);
+    return { id: attachmentId, name: file.name, type: file.type, size: file.size, path, url: data.publicUrl };
+  }
+
+  if (file.size > instructionLocalFileLimit) {
+    throw new Error(`${file.name}: zonder database is de lokale limiet 750 kB.`);
+  }
+  return {
+    id: attachmentId,
+    name: file.name,
+    type: file.type,
+    size: file.size,
+    path: "",
+    url: await instructionFileToDataUrl(file)
+  };
+}
+
+async function removeInstructionFile(instruction, attachment) {
+  if (attachment.path && databaseReady && databaseClient) {
+    const { error } = await databaseClient.storage.from(instructionBucket).remove([attachment.path]);
+    if (error) {
+      showToast("Bestand kon niet uit Storage worden verwijderd");
+      return false;
+    }
+  }
+  instruction.attachments = instruction.attachments.filter((item) => item.id !== attachment.id);
+  return true;
+}
+
 function renderRoomSchedule() {
   const day = roomScheduleDays[roomScheduleDayIndex];
-  const scheduleStart = 8 * 60;
-  const scheduleEnd = 18 * 60;
+  const configuredRange = parseScheduleRange(
+    `${roomScheduleData.start || "08:00"} - ${roomScheduleData.end || "18:00"}`
+  );
+  const scheduleStart = configuredRange?.start ?? 8 * 60;
+  const scheduleEnd = configuredRange?.end ?? 18 * 60;
   const slotMinutes = 15;
   const totalSlots = (scheduleEnd - scheduleStart) / slotMinutes;
-  const timeTicks = Array.from({ length: ((scheduleEnd - scheduleStart) / 60) + 1 }, (_, index) => {
-    const minutes = scheduleStart + (index * 60);
+  const timeTicks = Array.from({ length: totalSlots }, (_, index) => {
+    const minutes = scheduleStart + (index * slotMinutes);
     return {
       label: formatScheduleTime(minutes),
       row: ((minutes - scheduleStart) / slotMinutes) + 2
@@ -3373,12 +5326,22 @@ function renderRoomSchedule() {
     `)
     .join("");
 
+  roomScheduleLegend.innerHTML = roomScheduleLegendItems
+    .map((item) => `
+      <span class="room-schedule-legend-item">
+        <i class="${escapeAttribute(item.type)}" aria-hidden="true"></i>
+        ${escapeHTML(item.label)}
+      </span>
+    `)
+    .join("");
+
   roomScheduleBoard.innerHTML = `
     <div class="room-timetable" style="--room-count: ${roomScheduleRooms.length}; --slot-count: ${totalSlots};">
       <div class="room-timetable-corner">Tijd</div>
       ${roomScheduleRooms.map((room, index) => `
         <div class="room-timetable-room" style="grid-column: ${index + 2};">${escapeHTML(room)}</div>
       `).join("")}
+      <div class="room-timetable-time-lane" style="grid-row: 2 / span ${totalSlots};" aria-hidden="true"></div>
       ${timeTicks.map((tick) => `
         <time class="room-timetable-time" style="grid-row: ${tick.row};">${escapeHTML(tick.label)}</time>
       `).join("")}
@@ -3387,8 +5350,8 @@ function renderRoomSchedule() {
       `).join("")}
       ${events.map((event) => `
         <article
-          class="room-timetable-event ${event.type}"
-          style="grid-column: ${event.column}; grid-row: ${event.rowStart} / span ${event.rowSpan};"
+          class="room-timetable-event ${event.type} ${event.rowSpan === 1 ? "compact" : ""}"
+          style="grid-column: ${event.column} / span ${event.columnSpan}; grid-row: ${event.rowStart} / span ${event.rowSpan};"
           role="button"
           tabindex="0"
           aria-label="${escapeAttribute(`${event.time}, ${event.room}, ${event.activity}`)}"
@@ -3412,19 +5375,22 @@ function roomScheduleEventsFor(day, scheduleStart, slotMinutes) {
     const start = range?.start ?? scheduleStart;
     const end = range?.end ?? start + 60;
     const rowStart = Math.max(2, Math.round((start - scheduleStart) / slotMinutes) + 2);
-    const rowSpan = Math.max(2, Math.round((end - start) / slotMinutes));
+    const rowSpan = Math.max(1, Math.round((end - start) / slotMinutes));
 
     return row.rooms.map((room) => {
-      const roomIndex = roomScheduleRooms.indexOf(room.room);
+      const roomIndex = Number.isInteger(room.column)
+        ? room.column
+        : roomScheduleRooms.indexOf(room.room);
       return {
         activity: room.activity,
         column: (roomIndex === -1 ? roomScheduleRooms.length - 1 : roomIndex) + 2,
+        columnSpan: Math.max(1, Number(room.columnSpan) || 1),
         key: `${row.time}-${room.room}-${room.activity}`,
         room: room.room,
         rowStart,
         rowSpan,
         time: row.time,
-        type: roomScheduleEventType(room.activity)
+        type: room.type || roomScheduleEventType(room.activity)
       };
     });
   });
@@ -3674,9 +5640,13 @@ function renderAll() {
   renderManagement();
   renderFeedback();
   renderImportantInfo();
+  renderGeneralAgreements();
+  renderBoardProfiles();
   renderSetupModule();
   renderSetupManagement();
   renderSchedule();
+  renderInstructions();
+  renderPublicInstructionLibrary();
   renderRoomSchedule();
   renderView();
   persist();
@@ -3971,11 +5941,319 @@ homeView.addEventListener("click", (event) => {
   openView(tile.dataset.homeTarget);
 });
 
+openInstructionLibraryButton.addEventListener("click", () => {
+  publicInstructionSearch.value = "";
+  publicInstructionCategory = "all";
+  openView("instructionLibraryView");
+  requestAnimationFrame(() => publicInstructionSearch.focus());
+});
+
+closeInstructionLibraryButton.addEventListener("click", () => openView("scheduleView"));
+
+publicInstructionSearch.addEventListener("input", renderPublicInstructionLibrary);
+
+publicInstructionFilters.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-public-instruction-category]");
+  if (!button) return;
+  publicInstructionCategory = button.dataset.publicInstructionCategory;
+  renderPublicInstructionLibrary();
+});
+
+publicInstructionResults.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-public-instruction-id]");
+  if (!button) return;
+  const instruction = state.gameInstructions.find((item) => item.id === button.dataset.publicInstructionId);
+  if (instruction) openInstructionViewer([instruction], button);
+});
+
 scheduleCategorySwitch.addEventListener("click", (event) => {
   const button = event.target.closest("[data-schedule-category]");
   if (!button) return;
   scheduleCategory = button.dataset.scheduleCategory;
   renderAll();
+});
+
+toverlandHub.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-toverland-resource]");
+  if (!button) return;
+  if (button.dataset.toverlandResource === "roster") {
+    openToverlandRoster(button);
+    return;
+  }
+  openToverlandResource(button.dataset.toverlandResource, button);
+});
+
+closeToverlandRosterButton.addEventListener("click", closeToverlandRoster);
+toverlandRosterModal.addEventListener("click", (event) => {
+  if (event.target === toverlandRosterModal) {
+    closeToverlandRoster();
+    return;
+  }
+  const modeButton = event.target.closest("[data-toverland-roster-mode]");
+  if (!modeButton) return;
+  toverlandRosterMode = modeButton.dataset.toverlandRosterMode;
+  renderToverlandRoster();
+});
+
+scheduleBoard.addEventListener("click", (event) => {
+  const cleaningRosterButton = event.target.closest("[data-open-cleaning-roster]");
+  if (cleaningRosterButton) {
+    openCleaningRoster(cleaningRosterButton);
+    return;
+  }
+
+  const toverlandResourceButton = event.target.closest("[data-toverland-resource]");
+  if (toverlandResourceButton) {
+    if (toverlandResourceButton.dataset.toverlandResource === "roster") {
+      openToverlandRoster(toverlandResourceButton);
+    } else {
+      openToverlandResource(toverlandResourceButton.dataset.toverlandResource, toverlandResourceButton);
+    }
+    return;
+  }
+
+  const ranjaInfoButton = event.target.closest("[data-open-ranja-info]");
+  if (ranjaInfoButton) {
+    openRanjaInfo(ranjaInfoButton);
+    return;
+  }
+
+  const instructionButton = event.target.closest("[data-open-activity-instructions]");
+  if (instructionButton) {
+    openInstructionViewer(instructionsForActivity(instructionButton.dataset.openActivityInstructions), instructionButton);
+    return;
+  }
+
+  const toggle = event.target.closest("[data-rotation-toggle]");
+  if (toggle) {
+    const rotationState = scheduleRotationUI.get(toggle.dataset.rotationToggle);
+    if (!rotationState) return;
+    rotationState.expanded = !rotationState.expanded;
+    renderSchedule();
+    return;
+  }
+
+  const roundButton = event.target.closest("[data-rotation-round]");
+  if (!roundButton) return;
+  const rotationState = scheduleRotationUI.get(roundButton.dataset.rotationKey);
+  if (!rotationState) return;
+  rotationState.round = roundButton.dataset.rotationRound;
+  renderSchedule();
+});
+
+scheduleBoard.addEventListener("change", (event) => {
+  const groupSelect = event.target.closest("[data-rotation-group]");
+  if (!groupSelect) return;
+  const rotationState = scheduleRotationUI.get(groupSelect.dataset.rotationGroup);
+  if (!rotationState) return;
+  rotationState.group = groupSelect.value;
+  renderSchedule();
+});
+
+instructionSearch.addEventListener("input", () => {
+  instructionActivityFilter = "";
+  renderInstructions();
+});
+
+instructionCategoryFilter.addEventListener("change", () => {
+  instructionActivityFilter = "";
+  renderInstructions();
+});
+
+instructionList.addEventListener("click", (event) => {
+  const clearFilterButton = event.target.closest("[data-clear-instruction-activity-filter]");
+  if (clearFilterButton) {
+    instructionActivityFilter = "";
+    renderInstructions();
+    return;
+  }
+
+  const item = event.target.closest("[data-instruction-id]");
+  if (!item) return;
+  activeInstructionId = item.dataset.instructionId;
+  renderInstructions();
+  if (window.matchMedia("(max-width: 959px)").matches) {
+    instructionDetail.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+});
+
+instructionDetail.addEventListener("change", (event) => {
+  const categorySelect = event.target.closest("[data-instruction-link-category]");
+  if (categorySelect) {
+    instructionLinkCategory = categorySelect.value;
+    renderInstructions();
+    return;
+  }
+
+  const daySelectElement = event.target.closest("[data-instruction-link-day]");
+  if (daySelectElement) {
+    instructionLinkDayIndex = Number(daySelectElement.value);
+    renderInstructions();
+  }
+});
+
+instructionDetail.addEventListener("submit", (event) => {
+  const linkForm = event.target.closest("#instructionLinkForm");
+  if (!linkForm) return;
+  event.preventDefault();
+  if (!isManager()) return;
+  const instruction = state.gameInstructions.find((item) => item.id === activeInstructionId);
+  const activityId = linkForm.querySelector("[data-instruction-link-activity]")?.value;
+  if (!instruction || !activityId || instruction.activityIds.includes(activityId)) return;
+  instruction.activityIds.push(activityId);
+  instruction.updatedAt = new Date().toISOString();
+  renderAll();
+  showToast("Activiteit gekoppeld");
+});
+
+instructionDetail.addEventListener("click", async (event) => {
+  const imageButton = event.target.closest("[data-view-instruction-image]");
+  if (imageButton) {
+    const instruction = state.gameInstructions.find((item) => item.id === activeInstructionId);
+    const attachment = instruction?.attachments.find((item) => item.id === imageButton.dataset.viewInstructionImage);
+    if (attachment) openInstructionImageViewer(attachment, imageButton);
+    return;
+  }
+
+  const editButton = event.target.closest("[data-edit-instruction]");
+  if (editButton) {
+    openInstructionEditor(editButton.dataset.editInstruction);
+    return;
+  }
+
+  const unlinkButton = event.target.closest("[data-unlink-instruction-activity]");
+  if (unlinkButton && isManager()) {
+    const instruction = state.gameInstructions.find((item) => item.id === activeInstructionId);
+    if (!instruction) return;
+    instruction.activityIds = instruction.activityIds.filter((activityId) => activityId !== unlinkButton.dataset.unlinkInstructionActivity);
+    instruction.updatedAt = new Date().toISOString();
+    renderAll();
+    showToast("Koppeling verwijderd");
+    return;
+  }
+
+  const removeFileButton = event.target.closest("[data-remove-instruction-file]");
+  if (removeFileButton && isManager()) {
+    const instruction = state.gameInstructions.find((item) => item.id === activeInstructionId);
+    const attachment = instruction?.attachments.find((item) => item.id === removeFileButton.dataset.removeInstructionFile);
+    if (!instruction || !attachment) return;
+    if (!window.confirm(`Bestand '${attachment.name}' verwijderen?`)) return;
+    if (await removeInstructionFile(instruction, attachment)) {
+      instruction.updatedAt = new Date().toISOString();
+      renderAll();
+      showToast("Bestand verwijderd");
+    }
+    return;
+  }
+
+  const deleteButton = event.target.closest("[data-delete-instruction]");
+  if (deleteButton && isManager()) {
+    const instruction = state.gameInstructions.find((item) => item.id === deleteButton.dataset.deleteInstruction);
+    if (!instruction || !window.confirm(`Spelinstructie '${instruction.title}' definitief verwijderen?`)) return;
+    if (instruction.attachments.some((attachment) => attachment.path) && databaseReady && databaseClient) {
+      const paths = instruction.attachments.map((attachment) => attachment.path).filter(Boolean);
+      const { error } = await databaseClient.storage.from(instructionBucket).remove(paths);
+      if (error) {
+        showToast("Bestanden konden niet worden verwijderd");
+        return;
+      }
+    }
+    state.gameInstructions = state.gameInstructions.filter((item) => item.id !== instruction.id);
+    activeInstructionId = "";
+    renderAll();
+    showToast("Spelinstructie verwijderd");
+  }
+});
+
+addInstructionButton.addEventListener("click", () => openInstructionEditor());
+cancelInstructionButton.addEventListener("click", closeInstructionEditor);
+cancelInstructionFooterButton.addEventListener("click", closeInstructionEditor);
+
+instructionModal.addEventListener("click", (event) => {
+  if (event.target === instructionModal) closeInstructionEditor();
+});
+
+closeInstructionImageViewerButton.addEventListener("click", closeInstructionImageViewer);
+boardGuideButton.addEventListener("click", openBoardGuide);
+closeBoardGuideButton.addEventListener("click", closeBoardGuide);
+previousInstructionViewerItemButton.addEventListener("click", () => moveInstructionViewer(-1));
+nextInstructionViewerItemButton.addEventListener("click", () => moveInstructionViewer(1));
+instructionImageViewer.addEventListener("click", (event) => {
+  if (!event.target.closest("img, iframe, .instruction-viewer-text, figcaption, button")) closeInstructionImageViewer();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (!toverlandRosterModal.classList.contains("hidden") && event.key === "Escape") {
+    closeToverlandRoster();
+    return;
+  }
+  if (!boardGuideViewer.classList.contains("hidden") && event.key === "Escape") {
+    closeBoardGuide();
+    return;
+  }
+  if (instructionImageViewer.classList.contains("hidden")) return;
+  if (event.key === "Escape") closeInstructionImageViewer();
+  if (event.key === "ArrowLeft") moveInstructionViewer(-1);
+  if (event.key === "ArrowRight") moveInstructionViewer(1);
+});
+
+instructionForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!isManager()) return;
+
+  const title = instructionTitle.value.trim();
+  if (!title) return;
+  let instruction = state.gameInstructions.find((item) => item.id === instructionId.value);
+  if (!instruction) {
+    const id = `instructie-${makeId(title, state.gameInstructions.map((item) => item.id.replace(/^instructie-/, "")))}`;
+    instruction = {
+      id,
+      title,
+      category: instructionCategory.value,
+      summary: "",
+      body: "",
+      materials: "",
+      safety: "",
+      activityIds: instructionActivityFilter ? [instructionActivityFilter] : [],
+      attachments: [],
+      createdBy: currentUserName(),
+      updatedAt: ""
+    };
+    state.gameInstructions.push(instruction);
+  }
+
+  instruction.title = title;
+  instruction.category = instructionCategory.value;
+  instruction.summary = instructionSummary.value.trim();
+  instruction.body = instructionBody.value.trim();
+  instruction.materials = instructionMaterials.value.trim();
+  instruction.safety = instructionSafety.value.trim();
+  instruction.updatedAt = new Date().toISOString();
+  activeInstructionId = instruction.id;
+
+  const files = Array.from(instructionFiles.files || []);
+  const errors = [];
+  saveInstructionButton.disabled = true;
+  for (const [index, file] of files.entries()) {
+    instructionUploadStatus.textContent = `Bestand ${index + 1} van ${files.length} uploaden...`;
+    try {
+      instruction.attachments.push(await uploadInstructionFile(instruction, file));
+    } catch (error) {
+      errors.push(error.message);
+    }
+  }
+  saveInstructionButton.disabled = false;
+  instructionFiles.value = "";
+
+  if (errors.length) {
+    instructionUploadStatus.textContent = `Tekst opgeslagen. ${errors.join(" ")}`;
+    renderAll();
+    return;
+  }
+
+  closeInstructionEditor();
+  renderAll();
+  showToast("Spelinstructie opgeslagen");
 });
 
 roomScheduleSwitch.addEventListener("click", (event) => {
@@ -3984,6 +6262,7 @@ roomScheduleSwitch.addEventListener("click", (event) => {
   roomScheduleDayIndex = Number(button.dataset.roomScheduleDay);
   hideRoomScheduleDetail();
   renderAll();
+  roomScheduleBoard.scrollLeft = 0;
 });
 
 roomScheduleBoard.addEventListener("click", (event) => {
@@ -4024,11 +6303,20 @@ nextScheduleDay.addEventListener("click", () => {
 });
 
 scheduleBoard.addEventListener("pointerdown", (event) => {
+  if (event.target.closest("[data-schedule-interactive]")) {
+    scheduleSwipeStartX = null;
+    return;
+  }
   scheduleSwipeStartX = event.clientX;
 });
 
 scheduleBoard.addEventListener("pointerup", (event) => {
+  if (scheduleSwipeStartX === null || event.target.closest("[data-schedule-interactive]")) {
+    scheduleSwipeStartX = null;
+    return;
+  }
   const deltaX = event.clientX - scheduleSwipeStartX;
+  scheduleSwipeStartX = null;
   if (Math.abs(deltaX) < 60) return;
 
   if (deltaX < 0 && scheduleDayIndex < scheduleDays.length - 1) {
@@ -4233,6 +6521,44 @@ addManagerForm.addEventListener("submit", (event) => {
   renderAll();
 });
 
+boardProfileEditor.addEventListener("submit", async (event) => {
+  const form = event.target.closest("[data-board-profile]");
+  if (!form) return;
+  event.preventDefault();
+  if (!isManager()) return;
+
+  const profiles = form.dataset.boardProfileKind === "support" ? state.supportProfiles : state.managers;
+  const profile = profiles.find((person) => person.id === form.dataset.boardProfile);
+  if (!profile) return;
+
+  const submitButton = form.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
+
+  try {
+    const photoFile = form.elements.photo.files[0];
+    if (photoFile) profile.photo = await boardPhotoToDataUrl(photoFile);
+    profile.boardRole = form.elements.boardRole.value.trim().replace(/\s+/g, " ") || (form.dataset.boardProfileKind === "support" ? "Ondersteuning" : "Bestuurslid");
+    profile.intro = form.elements.intro.value.trim().replace(/\s+/g, " ");
+    profile.phone = form.elements.phone.value.trim();
+    renderAll();
+    showToast(form.dataset.boardProfileKind === "support" ? "Ondersteuningsprofiel opgeslagen" : "Bestuursprofiel opgeslagen");
+  } catch (error) {
+    submitButton.disabled = false;
+    showToast(error.message || "Profiel kon niet worden opgeslagen");
+  }
+});
+
+boardProfileEditor.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-remove-board-photo]");
+  if (!button || !isManager()) return;
+  const profiles = button.dataset.boardProfileKind === "support" ? state.supportProfiles : state.managers;
+  const profile = profiles.find((person) => person.id === button.dataset.removeBoardPhoto);
+  if (!profile) return;
+  profile.photo = "";
+  renderAll();
+  showToast("Profielfoto verwijderd");
+});
+
 bulkKidsForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!isManager()) return;
@@ -4288,7 +6614,14 @@ bulkUsersForm.addEventListener("submit", async (event) => {
         return;
       }
 
-      state.managers.push({ id: makeId(name, state.managers.map((person) => person.id)), name });
+      state.managers.push({
+        id: makeId(name, state.managers.map((person) => person.id)),
+        name,
+        boardRole: csvValue(row, ["functie", "bestuursfunctie", "position"]) || "Bestuurslid",
+        intro: csvValue(row, ["intro", "introductie", "omschrijving"]),
+        phone: csvValue(row, ["telefoon", "mobiel", "whatsapp", "phone"]),
+        photo: csvValue(row, ["foto", "photo", "afbeelding"])
+      });
       addedBoard += 1;
       return;
     }
@@ -4402,6 +6735,11 @@ managementWorkspace.addEventListener("click", (event) => {
   const tile = event.target.closest("[data-management-target]");
   if (tile) {
     activeManagementPanel = tile.dataset.managementTarget;
+    if (activeManagementPanel === "instructions") {
+      instructionActivityFilter = "";
+      instructionSearch.value = "";
+      instructionCategoryFilter.value = "all";
+    }
     renderAll();
     return;
   }
@@ -4531,6 +6869,7 @@ setupTaskList.addEventListener("click", (event) => {
 feedbackForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const text = feedbackText.value.trim();
+  const feedbackGroup = feedbackGroupForCurrentUser();
   if (!text) {
     showToast("Vul eerst een evaluatie in");
     return;
@@ -4543,7 +6882,9 @@ feedbackForm.addEventListener("submit", (event) => {
     userKey: userKey(state.currentUser),
     userName: currentUserName(),
     role: isManager() ? "Bestuurslid" : "Groepsleider",
-    groupName: activeGroup()?.name || "",
+    groupId: feedbackGroup?.id || "",
+    groupName: feedbackGroup?.name || "",
+    reactions: {},
     createdAt: new Intl.DateTimeFormat("nl-NL", {
       day: "2-digit",
       month: "short",
@@ -4564,6 +6905,24 @@ clearFeedbackButton.addEventListener("click", () => {
 });
 
 feedbackList.addEventListener("click", (event) => {
+  const reactionButton = event.target.closest("[data-feedback-reaction]");
+  if (reactionButton) {
+    const entry = state.feedback.find((item) => item.id === reactionButton.dataset.feedbackId);
+    if (!entry || !canReactToFeedback(entry)) return;
+
+    entry.reactions ||= {};
+    const currentUserKey = userKey(state.currentUser);
+    const reaction = reactionButton.dataset.feedbackReaction;
+    if (entry.reactions[currentUserKey] === reaction) {
+      delete entry.reactions[currentUserKey];
+    } else {
+      entry.reactions[currentUserKey] = reaction;
+    }
+
+    renderAll();
+    return;
+  }
+
   const button = event.target.closest("[data-remove-feedback]");
   if (!button) return;
   if (!isManager()) {
@@ -4634,6 +6993,20 @@ importantInfoList.addEventListener("click", (event) => {
   state.importantInfo = state.importantInfo.filter((entry) => entry.id !== button.dataset.removeInfo);
   renderAll();
   showToast("Info verwijderd");
+});
+
+agreementsList.addEventListener("click", (event) => {
+  const toggleButton = event.target.closest("[data-toggle-agreement]");
+  if (toggleButton) {
+    const agreementId = toggleButton.dataset.toggleAgreement;
+    openAgreementId = openAgreementId === agreementId ? "" : agreementId;
+    renderGeneralAgreements();
+    requestAnimationFrame(() => {
+      agreementsList.querySelector(`[data-toggle-agreement="${CSS.escape(agreementId)}"]`)?.focus({ preventScroll: true });
+    });
+    return;
+  }
+
 });
 
 leadersList.addEventListener("click", (event) => {

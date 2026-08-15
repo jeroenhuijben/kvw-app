@@ -2367,6 +2367,13 @@ const roomScheduleData = window.KVW_TIMETABLE_DATA || {};
 const roomScheduleDays = roomScheduleData.days || legacyRoomScheduleDays;
 const roomScheduleRooms = roomScheduleData.rooms || legacyRoomScheduleRooms;
 const roomScheduleLegendItems = roomScheduleData.legend || [];
+const sponsors = (window.KVW_SPONSORS || [])
+  .filter((sponsor) => sponsor?.name && sponsor?.logo)
+  .map((sponsor) => ({
+    name: String(sponsor.name).trim(),
+    logo: String(sponsor.logo).trim(),
+    website: String(sponsor.website || "").trim()
+  }));
 
 let roomScheduleDayIndex = 0;
 
@@ -2384,6 +2391,9 @@ const attendanceChrome = document.querySelectorAll("[data-attendance-chrome]");
 const homeView = document.querySelector("#homeView");
 const criticalInfoBanner = document.querySelector("#criticalInfoBanner");
 const criticalInfoBannerText = document.querySelector("#criticalInfoBannerText");
+const sponsorLogoRail = document.querySelector("#sponsorLogoRail");
+const sponsorGrid = document.querySelector("#sponsorGrid");
+const closeSponsorsButton = document.querySelector("#closeSponsorsButton");
 const groupCards = document.querySelector("#groupCards");
 const manageList = document.querySelector("#manageList");
 const kidsSearchInput = document.querySelector("#kidsSearchInput");
@@ -2715,7 +2725,7 @@ function applySharedState(sharedState) {
 
   state = normalizeState({ ...structuredClone(seed), ...sharedState });
   state.currentUser = session.currentUser && userExists(state, session.currentUser) ? session.currentUser : null;
-  state.activeView = ["homeView", "todayView", "scheduleView", "instructionLibraryView", "setupView", "roomScheduleView", "feedbackView", "contactsView", "agreementsView", "boardView", "groupsView", "kidsView", "managementView"].includes(session.activeView)
+  state.activeView = ["homeView", "todayView", "scheduleView", "instructionLibraryView", "setupView", "roomScheduleView", "feedbackView", "contactsView", "agreementsView", "sponsorsView", "boardView", "groupsView", "kidsView", "managementView"].includes(session.activeView)
     ? session.activeView
     : "homeView";
   if (!state.setupModuleEnabled && state.activeView === "setupView") {
@@ -3051,7 +3061,7 @@ function normalizeState(nextState) {
     };
   });
 
-  if (!["homeView", "todayView", "scheduleView", "instructionLibraryView", "setupView", "roomScheduleView", "feedbackView", "contactsView", "agreementsView", "boardView", "groupsView", "kidsView", "managementView"].includes(nextState.activeView)) {
+  if (!["homeView", "todayView", "scheduleView", "instructionLibraryView", "setupView", "roomScheduleView", "feedbackView", "contactsView", "agreementsView", "sponsorsView", "boardView", "groupsView", "kidsView", "managementView"].includes(nextState.activeView)) {
     nextState.activeView = "homeView";
   }
 
@@ -3349,6 +3359,49 @@ function renderManageList() {
       </article>
     `;
   }
+}
+
+function safeSponsorWebsite(value) {
+  if (!value) return "";
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol) ? url.href : "";
+  } catch {
+    return "";
+  }
+}
+
+function renderSponsors() {
+  if (!sponsors.length) {
+    sponsorLogoRail.innerHTML = `<span class="sponsor-strip-placeholder">Logo's volgen</span>`;
+    sponsorGrid.innerHTML = `
+      <div class="sponsor-empty">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z" /></svg>
+        <strong>Sponsorlogo's worden binnenkort toegevoegd</strong>
+        <span>We zijn onze sponsoren ontzettend dankbaar voor hun bijdrage.</span>
+      </div>
+    `;
+    return;
+  }
+
+  sponsorLogoRail.innerHTML = sponsors
+    .map((sponsor) => `<span class="sponsor-logo-mini"><img src="${escapeAttribute(sponsor.logo)}" alt="" /></span>`)
+    .join("");
+
+  sponsorGrid.innerHTML = sponsors
+    .map((sponsor) => {
+      const website = safeSponsorWebsite(sponsor.website);
+      return `
+        <article class="sponsor-card">
+          <div class="sponsor-logo-box">
+            <img src="${escapeAttribute(sponsor.logo)}" alt="Logo van ${escapeAttribute(sponsor.name)}" />
+          </div>
+          <strong>${escapeHTML(sponsor.name)}</strong>
+          ${website ? `<a href="${escapeAttribute(website)}" target="_blank" rel="noopener noreferrer">Bezoek website</a>` : ""}
+        </article>
+      `;
+    })
+    .join("");
 }
 
 function savedKey() {
@@ -5677,6 +5730,7 @@ function renderAll() {
   renderChildList();
   renderGroups();
   renderManageList();
+  renderSponsors();
   renderSaveStatus();
   renderManagement();
   renderFeedback();
@@ -5976,6 +6030,8 @@ homeView.addEventListener("click", (event) => {
   if (!tile) return;
   openView(tile.dataset.homeTarget);
 });
+
+closeSponsorsButton.addEventListener("click", () => openView("homeView"));
 
 openInstructionLibraryButton.addEventListener("click", () => {
   publicInstructionSearch.value = "";

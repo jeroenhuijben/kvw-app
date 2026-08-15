@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icons/kvw-app-192.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260815-kid-details-scroll" />
+    <link rel="stylesheet" href="./styles.css?v=20260816-sponsors" />
   </head>
   <body>
     <main class="phone-shell" aria-label="App voor ochtendaanwezigheid">
@@ -152,6 +152,14 @@
             <span>Bestuur &amp; ondersteuning</span>
           </button>
         </div>
+        <button class="sponsor-strip" type="button" data-home-target="sponsorsView" aria-label="Bekijk onze sponsoren">
+          <span class="sponsor-strip-copy">
+            <small>Mede mogelijk gemaakt door</small>
+            <strong>Onze sponsoren</strong>
+          </span>
+          <span class="sponsor-logo-rail" id="sponsorLogoRail" aria-hidden="true"></span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+        </button>
       </section>
 
       <section class="content-view hidden" id="todayView" aria-label="Aanwezigheid">
@@ -342,6 +350,19 @@
 
           <div class="agreements-list" id="agreementsList"></div>
         </div>
+      </section>
+
+      <section class="content-view hidden sponsors-view" id="sponsorsView" aria-label="Sponsoren">
+        <div class="sponsors-header">
+          <button class="icon-button" id="closeSponsorsButton" type="button" aria-label="Terug naar Start">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+          </button>
+          <div>
+            <h2>Onze sponsoren</h2>
+            <p>Dankzij hun steun maken we er samen een mooie KVW-week van.</p>
+          </div>
+        </div>
+        <div class="sponsor-grid" id="sponsorGrid"></div>
       </section>
 
       <section class="content-view hidden" id="boardView" aria-label="Bestuur en ondersteuning">
@@ -845,7 +866,8 @@
     <script src="./timetable-data.js"></script>
     <script src="./instruction-data.js"></script>
     <script src="./agreements-data.js?v=20260810"></script>
-    <script src="./app.js?v=20260815-kid-details-import"></script>
+    <script src="./sponsor-data.js?v=20260816"></script>
+    <script src="./app.js?v=20260816-sponsors"></script>
     <script>
       if ("serviceWorker" in navigator && window.location.protocol.startsWith("http")) {
         window.addEventListener("load", () => {

@@ -1,14 +1,15 @@
-const CACHE_NAME = "kvw-shell-v7-kid-details-import";
+const CACHE_NAME = "kvw-shell-v8-sponsors";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=20260815-kid-details-scroll",
-  "./app.js?v=20260815-kid-details-import",
+  "./styles.css?v=20260816-sponsors",
+  "./app.js?v=20260816-sponsors",
   "./supabase-config.js",
   "./program-data.js?v=20260811-heukelom-route",
   "./timetable-data.js",
   "./instruction-data.js",
   "./agreements-data.js?v=20260810",
+  "./sponsor-data.js?v=20260816",
   "./kvw-logo.png",
   "./manifest.webmanifest",
   "./apple-touch-icon.png",

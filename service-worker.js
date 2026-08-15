@@ -1,4 +1,4 @@
-const CACHE_NAME = "kvw-shell-v8-sponsors";
+const CACHE_NAME = "kvw-shell-v9-sponsor-logos";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -9,13 +9,17 @@ const APP_SHELL = [
   "./timetable-data.js",
   "./instruction-data.js",
   "./agreements-data.js?v=20260810",
-  "./sponsor-data.js?v=20260816",
+  "./sponsor-data.js?v=20260816-current",
   "./kvw-logo.png",
   "./manifest.webmanifest",
   "./apple-touch-icon.png",
   "./assets/icons/kvw-app-192.png",
   "./assets/icons/kvw-app-512.png",
-  "./assets/cleaning/schoonmaakrooster-kvw-2026.jpg"
+  "./assets/cleaning/schoonmaakrooster-kvw-2026.jpg",
+  "./assets/sponsors/be-frank-it-audit.png",
+  "./assets/sponsors/willems-allround-service.png",
+  "./assets/sponsors/gemeente-tilburg.png",
+  "./assets/sponsors/drukkerij-habe.avif"
 ];
 
 self.addEventListener("install", (event) => {

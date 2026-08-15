@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="./assets/icons/kvw-app-192.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260815-roster-mobile" />
+    <link rel="stylesheet" href="./styles.css?v=20260815-kid-details-scroll" />
   </head>
   <body>
     <main class="phone-shell" aria-label="App voor ochtendaanwezigheid">
@@ -363,13 +363,17 @@
       <section class="content-view hidden" id="kidsView" aria-label="Kinderen">
         <div class="section-title">
           <h2>Kinderen</h2>
-          <p>Bekijk direct in welke groep kinderen zijn ingedeeld.</p>
+          <p>Vind een kind en bekijk de groep en bijzonderheden.</p>
         </div>
-        <form class="add-form" id="addKidForm">
-          <input id="newKidName" type="text" placeholder="Naam kind" autocomplete="off" />
-          <button type="submit">Toevoegen</button>
-        </form>
-        <div class="manage-list" id="manageList"></div>
+        <div class="kids-search-panel">
+          <label for="kidsSearchInput">Zoek een kind</label>
+          <div class="kids-search-field">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></svg>
+            <input id="kidsSearchInput" type="search" placeholder="Naam, groep of bijzonderheid" autocomplete="off" />
+          </div>
+          <p id="kidsSearchSummary" aria-live="polite"></p>
+        </div>
+        <div class="children-directory" id="manageList" role="table" aria-label="Kinderenoverzicht"></div>
       </section>
 
       <section class="content-view hidden" id="managementView" aria-label="Beheer">
@@ -520,10 +524,10 @@
               </div>
               <div class="bulk-import-grid">
                 <form class="manager-form bulk-import-form" id="bulkKidsForm">
-                  <label for="bulkKidsCsv">Kinderen importeren</label>
+                  <label for="bulkKidsCsv">Bijzonderheden van kinderen importeren</label>
                   <input id="bulkKidsCsv" type="file" accept=".csv,text/csv" />
-                  <p>CSV-kolommen: naam, groep</p>
-                  <button type="submit">Kinderen importeren</button>
+                  <p>CSV-kolommen: naam, groep, bijzonderheden. Alleen bestaande kinderen worden bijgewerkt.</p>
+                  <button type="submit">Bijzonderheden importeren</button>
                 </form>
                 <form class="manager-form bulk-import-form" id="bulkUsersForm">
                   <label for="bulkUsersCsv">Gebruikers importeren</label>
@@ -634,7 +638,7 @@
           </svg>
           <span>Groepen</span>
         </button>
-        <button type="button" data-view="kidsView" data-manager-only aria-label="Kinderen">
+        <button type="button" data-view="kidsView" aria-label="Kinderen">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="12" cy="12" r="10" />
             <path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01" />
@@ -841,7 +845,7 @@
     <script src="./timetable-data.js"></script>
     <script src="./instruction-data.js"></script>
     <script src="./agreements-data.js?v=20260810"></script>
-    <script src="./app.js?v=20260815-cleaning-roster"></script>
+    <script src="./app.js?v=20260815-kid-details-import"></script>
     <script>
       if ("serviceWorker" in navigator && window.location.protocol.startsWith("http")) {
         window.addEventListener("load", () => {

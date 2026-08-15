@@ -1,9 +1,9 @@
-const CACHE_NAME = "kvw-shell-v4-cleaning-roster";
+const CACHE_NAME = "kvw-shell-v7-kid-details-import";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=20260815-roster-mobile",
-  "./app.js?v=20260815-cleaning-roster",
+  "./styles.css?v=20260815-kid-details-scroll",
+  "./app.js?v=20260815-kid-details-import",
   "./supabase-config.js",
   "./program-data.js?v=20260811-heukelom-route",
   "./timetable-data.js",

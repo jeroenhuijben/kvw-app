@@ -73,6 +73,7 @@ const seed = {
       kids: ["Liam Clark", "Nora Evans", "Aria Singh", "Max Turner", "Ivy Walker", "Jonas Reed"]
     }
   ],
+  kidDetails: {},
   leaders: [
     { id: "mia", name: "Mia de Jong" },
     { id: "tom", name: "Tom Bakker" },
@@ -2385,8 +2386,8 @@ const criticalInfoBanner = document.querySelector("#criticalInfoBanner");
 const criticalInfoBannerText = document.querySelector("#criticalInfoBannerText");
 const groupCards = document.querySelector("#groupCards");
 const manageList = document.querySelector("#manageList");
-const addKidForm = document.querySelector("#addKidForm");
-const newKidName = document.querySelector("#newKidName");
+const kidsSearchInput = document.querySelector("#kidsSearchInput");
+const kidsSearchSummary = document.querySelector("#kidsSearchSummary");
 const markAllButton = document.querySelector("#markAllButton");
 const toast = document.querySelector("#toast");
 const saveDock = document.querySelector("#saveDock");
@@ -2574,6 +2575,7 @@ function persist() {
 function sharedStateSnapshot() {
   return {
     groups: state.groups,
+    kidDetails: state.kidDetails,
     leaders: state.leaders,
     managers: state.managers,
     supportProfiles: state.supportProfiles,
@@ -2610,6 +2612,7 @@ function sharedStateJson() {
 
 const sharedStateKeys = [
   "groups",
+  "kidDetails",
   "leaders",
   "managers",
   "supportProfiles",
@@ -2655,8 +2658,8 @@ function remoteUpdateToastMessage(changedKeys) {
   if (["scheduleView", "instructionLibraryView"].includes(state.activeView) && changed("gameInstructions", "instructionLibraryVersion")) {
     return "Spelinstructies bijgewerkt";
   }
-  if (["todayView", "groupsView", "kidsView"].includes(state.activeView) && changed("groups", "leaders", "managers")) {
-    return "Groepen bijgewerkt door een andere gebruiker";
+  if (["todayView", "groupsView", "kidsView"].includes(state.activeView) && changed("groups", "kidDetails", "leaders", "managers")) {
+    return "Kind- en groepsgegevens bijgewerkt";
   }
   if (state.activeView === "boardView" && changed("managers", "supportProfiles")) {
     return "Profielen bijgewerkt";
@@ -2665,7 +2668,7 @@ function remoteUpdateToastMessage(changedKeys) {
     if (activeManagementPanel === "instructions" && changed("gameInstructions", "instructionLibraryVersion")) {
       return "Spelinstructies bijgewerkt";
     }
-    if (activeManagementPanel === "groups" && changed("groups", "leaders")) {
+    if (activeManagementPanel === "groups" && changed("groups", "kidDetails", "leaders")) {
       return "Groepen bijgewerkt door een andere gebruiker";
     }
     if (["users", "overview"].includes(activeManagementPanel) && changed("groups", "leaders", "managers")) {
@@ -2901,6 +2904,9 @@ function normalizeState(nextState) {
   nextState.days = Array.isArray(nextState.days) && nextState.days.length ? nextState.days : structuredClone(seed.days);
   nextState.attendance ||= {};
   nextState.savedAt ||= {};
+  nextState.kidDetails = nextState.kidDetails && typeof nextState.kidDetails === "object" && !Array.isArray(nextState.kidDetails)
+    ? Object.fromEntries(Object.entries(nextState.kidDetails).map(([key, value]) => [key, String(value || "").trim().slice(0, 1000)]))
+    : {};
   nextState.userPins ||= {};
   nextState.userThemes ||= {};
   nextState.feedback = Array.isArray(nextState.feedback)
@@ -3062,7 +3068,7 @@ function normalizeState(nextState) {
     nextState.activeGroupId = visibleGroups[0]?.id || nextState.groups[0].id;
   }
 
-  if (nextState.currentUser?.role !== "manager" && ["kidsView", "managementView"].includes(nextState.activeView)) {
+  if (nextState.currentUser?.role !== "manager" && nextState.activeView === "managementView") {
     nextState.activeView = "homeView";
   }
 
@@ -3290,33 +3296,58 @@ function renderGroups() {
   }
 }
 
+function kidDetailsKey(groupId, kidName) {
+  return `${groupId}::${kidName}`;
+}
+
+function detailsForKid(groupId, kidName) {
+  return state.kidDetails[kidDetailsKey(groupId, kidName)] || "";
+}
+
 function renderManageList() {
-  if (!visibleGroupsFor().length) {
-    manageList.innerHTML = `<article class="manage-row"><span class="avatar" style="background:#d8ebff">?</span><strong class="child-name">Nog geen gekoppelde groepen</strong></article>`;
-    return;
-  }
+  const query = kidsSearchInput.value.trim().toLocaleLowerCase("nl");
+  const allRows = state.groups
+    .flatMap((group) => group.kids.map((kid) => ({
+      group,
+      kid,
+      details: detailsForKid(group.id, kid)
+    })))
+    .sort((a, b) => a.kid.localeCompare(b.kid, "nl"));
+  const rows = allRows.filter(({ group, kid, details }) => (
+    !query || [kid, group.name, details].some((value) => value.toLocaleLowerCase("nl").includes(query))
+  ));
 
-  const rows = isManager()
-    ? state.groups.flatMap((group) => group.kids.map((kid, index) => ({ group, kid, index })))
-    : activeGroup().kids.map((kid, index) => ({ group: activeGroup(), kid, index }));
+  kidsSearchSummary.textContent = query
+    ? `${rows.length} van ${allRows.length} kinderen gevonden`
+    : `${allRows.length} kinderen in ${state.groups.length} groepen`;
 
-  manageList.innerHTML = rows
-    .map(({ group, kid, index }) => `
-      <article class="manage-row">
-        <span class="avatar" style="background:${avatarColor(index)}">${initials(kid)}</span>
-        <span class="child-detail">
-          <strong class="child-name">${escapeHTML(kid)}</strong>
-          <span>${escapeHTML(group.name)}</span>
-        </span>
-        <button class="remove-button" type="button" data-remove="${escapeAttribute(kid)}" data-remove-from-group="${group.id}" aria-label="Verwijder ${escapeAttribute(kid)} uit ${escapeAttribute(group.name)}">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
-        </button>
-      </article>
-    `)
-    .join("");
+  manageList.innerHTML = `
+    <div class="children-directory-header" role="row" aria-hidden="true">
+      <span role="columnheader">Naam</span>
+      <span role="columnheader">Groep</span>
+      <span role="columnheader">Bijzonderheden</span>
+    </div>
+    <div class="children-directory-rows" role="rowgroup">
+      ${rows.map(({ group, kid, details }, index) => `
+        <article class="child-directory-row" role="row">
+          <div class="child-directory-name" role="cell">
+            <span class="avatar" style="background:${avatarColor(index)}">${initials(kid)}</span>
+            <strong>${escapeHTML(kid)}</strong>
+          </div>
+          <span class="child-directory-group" role="cell" data-label="Groep">${escapeHTML(group.name)}</span>
+          <p class="child-directory-details ${details ? "" : "empty"}" role="cell" data-label="Bijzonderheden">${escapeHTML(details || "Geen bijzonderheden")}</p>
+        </article>
+      `).join("")}
+    </div>
+  `;
 
   if (!rows.length) {
-    manageList.innerHTML = `<article class="manage-row"><span class="avatar" style="background:#d8ebff">?</span><span class="child-detail"><strong class="child-name">Nog geen kinderen</strong><span>Voeg kinderen toe bij een groep.</span></span></article>`;
+    manageList.querySelector(".children-directory-rows").innerHTML = `
+      <article class="children-directory-empty">
+        <strong>Geen kinderen gevonden</strong>
+        <span>Probeer een andere naam, groep of bijzonderheid.</span>
+      </article>
+    `;
   }
 }
 
@@ -3577,14 +3608,25 @@ function renderManagement() {
           <input type="text" placeholder="Naam kind" autocomplete="off" aria-label="Kind toevoegen aan ${escapeAttribute(group.name)}" />
           <button type="submit">Toevoegen</button>
         </form>
-        <div class="kid-pill-list">
+        <div class="manager-kid-list">
           ${group.kids.map((kid) => `
-            <span class="kid-pill">
-              <span>${escapeHTML(kid)}</span>
-              <button type="button" data-remove-group-kid="${group.id}" data-kid="${escapeAttribute(kid)}" aria-label="Verwijder ${escapeAttribute(kid)} uit ${escapeAttribute(group.name)}">
+            <article class="manager-kid-row">
+              <strong>${escapeHTML(kid)}</strong>
+              <label>
+                <span>Bijzonderheden</span>
+                <textarea
+                  rows="2"
+                  maxlength="1000"
+                  data-kid-details-group="${group.id}"
+                  data-kid-details-name="${escapeAttribute(kid)}"
+                  placeholder="Bijvoorbeeld allergie, medicatie of aandachtspunt"
+                  aria-label="Bijzonderheden voor ${escapeAttribute(kid)}"
+                >${escapeHTML(detailsForKid(group.id, kid))}</textarea>
+              </label>
+              <button class="manager-kid-remove" type="button" data-remove-group-kid="${group.id}" data-kid="${escapeAttribute(kid)}" aria-label="Verwijder ${escapeAttribute(kid)} uit ${escapeAttribute(group.name)}">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
               </button>
-            </span>
+            </article>
           `).join("")}
         </div>
       </article>
@@ -5464,6 +5506,7 @@ function removeKidFromGroup(groupId, kidName) {
   if (!group) return;
 
   group.kids = group.kids.filter((name) => name !== kidName);
+  delete state.kidDetails[kidDetailsKey(groupId, kidName)];
   Object.values(state.attendance).forEach((day) => {
     delete day[groupId]?.[kidName];
   });
@@ -5486,18 +5529,20 @@ function ensureGroup(name) {
   return group;
 }
 
-function addKidToGroupSilently(group, kidName) {
-  const name = kidName.trim().replace(/\s+/g, " ");
-  if (!group || !name) return false;
-  if (group.kids.some((kid) => kid.toLowerCase() === name.toLowerCase())) return false;
+function normalizeImportMatch(value) {
+  return String(value || "").trim().replace(/\s+/g, " ").toLocaleLowerCase("nl");
+}
 
-  group.kids.push(name);
-  state.days.forEach((day) => {
-    state.attendance[day] ||= {};
-    state.attendance[day][group.id] ||= {};
-    state.attendance[day][group.id][name] = "missing";
-  });
-  return true;
+function findExistingKidForImport(groupName, kidName) {
+  const normalizedGroup = normalizeImportMatch(groupName);
+  const normalizedKid = normalizeImportMatch(kidName);
+  if (!normalizedGroup || !normalizedKid) return null;
+
+  const group = state.groups.find((item) => normalizeImportMatch(item.name) === normalizedGroup);
+  if (!group) return null;
+
+  const storedKidName = group.kids.find((name) => normalizeImportMatch(name) === normalizedKid);
+  return storedKidName ? { group, kidName: storedKidName } : null;
 }
 
 function readCsvFile(input) {
@@ -5608,10 +5653,6 @@ function renderView() {
     state.activeView = "homeView";
   }
 
-  if (!isManager() && state.activeView === "kidsView") {
-    state.activeView = "homeView";
-  }
-
   views.forEach((view) => view.classList.toggle("hidden", view.id !== state.activeView));
   attendanceChrome.forEach((element) => {
     element.classList.toggle("hidden", state.activeView !== "todayView");
@@ -5662,11 +5703,6 @@ function setAttendance(kid, status) {
 function openView(viewId) {
   if (viewId === "setupView" && !state.setupModuleEnabled) {
     showToast("Opbouwmodule staat uit");
-    viewId = "homeView";
-  }
-
-  if (viewId === "kidsView" && !isManager()) {
-    showToast("Alleen voor bestuursleden");
     viewId = "homeView";
   }
 
@@ -6462,20 +6498,7 @@ groupCards.addEventListener("click", (event) => {
   renderAll();
 });
 
-addKidForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  if (addKidToGroup(state.activeGroupId, newKidName.value)) {
-    newKidName.value = "";
-    renderAll();
-  }
-});
-
-manageList.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-remove]");
-  if (!button) return;
-  removeKidFromGroup(button.dataset.removeFromGroup || state.activeGroupId, button.dataset.remove);
-  renderAll();
-});
+kidsSearchInput.addEventListener("input", renderManageList);
 
 createGroupForm.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -6567,25 +6590,41 @@ bulkKidsForm.addEventListener("submit", async (event) => {
   if (!text) return;
 
   const rows = parseCsv(text);
-  let added = 0;
-  let skipped = 0;
+  let updated = 0;
+  let unchanged = 0;
+  let notFound = 0;
+  let withoutDetails = 0;
 
   rows.forEach((row) => {
     const kidName = csvValue(row, ["naam", "kind", "kindnaam", "name", "child"]);
     const groupName = csvValue(row, ["groep", "groepsnaam", "group"]);
-    const group = ensureGroup(groupName);
+    const details = csvValue(row, ["bijzonderheden", "bijzonderheid", "details", "opmerking", "aandachtspunt"]).trim().slice(0, 1000);
+    const match = findExistingKidForImport(groupName, kidName);
 
-    if (addKidToGroupSilently(group, kidName)) {
-      added += 1;
-    } else {
-      skipped += 1;
+    if (!match) {
+      notFound += 1;
+      return;
     }
+
+    if (!details) {
+      withoutDetails += 1;
+      return;
+    }
+
+    const key = kidDetailsKey(match.group.id, match.kidName);
+    if (state.kidDetails[key] === details) {
+      unchanged += 1;
+      return;
+    }
+
+    state.kidDetails[key] = details;
+    updated += 1;
   });
 
   bulkKidsCsv.value = "";
-  bulkImportStatus.textContent = `${added} kinderen geïmporteerd, ${skipped} overgeslagen.`;
+  bulkImportStatus.textContent = `${updated} bijzonderheden bijgewerkt, ${unchanged} ongewijzigd, ${notFound} kinderen niet gevonden en ${withoutDetails} regels zonder bijzonderheden.`;
   renderAll();
-  showToast("Kinderen geïmporteerd");
+  showToast(updated ? "Bijzonderheden geïmporteerd" : "Geen bijzonderheden gewijzigd");
 });
 
 bulkUsersForm.addEventListener("submit", async (event) => {
@@ -7063,6 +7102,26 @@ managerGroups.addEventListener("submit", (event) => {
 });
 
 managerGroups.addEventListener("change", (event) => {
+  const detailsInput = event.target.closest("[data-kid-details-group]");
+  if (detailsInput) {
+    if (!isManager()) return;
+    const group = state.groups.find((item) => item.id === detailsInput.dataset.kidDetailsGroup);
+    const kidName = detailsInput.dataset.kidDetailsName;
+    if (!group?.kids.includes(kidName)) return;
+
+    const details = detailsInput.value.trim().slice(0, 1000);
+    const key = kidDetailsKey(group.id, kidName);
+    if (details) {
+      state.kidDetails[key] = details;
+    } else {
+      delete state.kidDetails[key];
+    }
+    persist();
+    renderManageList();
+    showToast("Bijzonderheden opgeslagen");
+    return;
+  }
+
   const nameInput = event.target.closest("[data-group-name]");
   if (nameInput) {
     const group = state.groups.find((item) => item.id === nameInput.dataset.groupName);
@@ -7136,6 +7195,9 @@ managerGroups.addEventListener("click", (event) => {
   }
 
   state.groups = state.groups.filter((group) => group.id !== groupId);
+  Object.keys(state.kidDetails).forEach((key) => {
+    if (key.startsWith(`${groupId}::`)) delete state.kidDetails[key];
+  });
   Object.values(state.attendance).forEach((day) => {
     delete day[groupId];
   });

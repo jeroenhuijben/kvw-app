@@ -229,7 +229,7 @@ const legacySchedulePrograms = {
       {
         "time": "12:15",
         "title": "Voorleeskwartier",
-        "detail": "Even een momentje rust met de kleuters. Laat elk kind wat ranja en een koekje halen en kom rustig zitten in de kleuterhoek. Er liggen boeken met sprookjes. Verzamel alle kleuters bij elkaar en de beste voorlezer van de groep leest voor.",
+        "detail": "Even een momentje rust met de kleuters. Laat de groepsleiding ranja en koekjes ophalen voor de hele groep en kom daarna rustig met de kinderen zitten in de kleuterhoek. Er liggen boeken met sprookjes. Verzamel alle kleuters bij elkaar en de beste voorlezer van de groep leest voor.",
         "type": "meal"
       },
       {
@@ -389,7 +389,7 @@ const legacySchedulePrograms = {
       {
         "time": "12:15",
         "title": "Voorleeskwartier",
-        "detail": "Even een momentje rust met de kleuters. Laat elk kind wat ranja en een koekje halen en kom rustig zitten in de kleuterhoek. Er liggen boeken met sprookjes. Verzamel alle kleuters bij elkaar en de beste voorlezer van de groep leest voor.",
+        "detail": "Even een momentje rust met de kleuters. Laat de groepsleiding ranja en koekjes ophalen voor de hele groep en kom daarna rustig met de kinderen zitten in de kleuterhoek. Er liggen boeken met sprookjes. Verzamel alle kleuters bij elkaar en de beste voorlezer van de groep leest voor.",
         "type": "meal"
       },
       {
@@ -723,7 +723,7 @@ const legacySchedulePrograms = {
       {
         "time": "12:00",
         "title": "Ranja en voorleeskwartier",
-        "detail": "Even een momentje rust met de kleuters. Laat elk kind wat ranja en een koekje halen en kom rustig zitten in de kleuterhoek. Er liggen boeken met sprookjes. Verzamel alle kleuters bij elkaar en de beste voorlezer van de groep leest voor.",
+        "detail": "Even een momentje rust met de kleuters. Laat de groepsleiding ranja en koekjes ophalen voor de hele groep en kom daarna rustig met de kinderen zitten in de kleuterhoek. Er liggen boeken met sprookjes. Verzamel alle kleuters bij elkaar en de beste voorlezer van de groep leest voor.",
         "type": "meal"
       },
       {
@@ -2142,59 +2142,59 @@ const toverlandRoster = [
 ];
 let toverlandRosterMode = "mine";
 let toverlandRosterReturnFocus = null;
-const cleaningRosterPdf = "./assets/cleaning/schoonmaakrooster-kvw-2026.pdf#view=FitH";
+const cleaningRosterImage = "./assets/cleaning/schoonmaakrooster-kvw-2026.jpg";
 const cleaningRosterByDay = {
   0: [
-    { task: "Kantine opruimen en poetsen", groups: ["Pupillen 2"] },
+    { task: "Kantine opruimen en poetsen", groups: ["Pupillen 2A"] },
     { task: "Sportveld opruimen", groups: ["Jongeren 1"] },
-    { task: "Gymzaal Laagstraat opruimen", groups: ["Kleuters 1b"] },
-    { task: "Gymzaal Wilgenstraat opruimen", groups: ["Kleuters 4b"] },
-    { task: "Keuken opruimen en poetsen", groups: ["Ouderen 3"] },
-    { task: "Toiletten kantine schoonmaken", groups: ["Kleuters 2a"] },
-    { task: "Toiletten gymzalen schoonmaken", groups: ["Kleuters 3b"] },
-    { task: "Binnenplaats opruimen", groups: ["Ouderen 1+2"] },
-    { task: "Kleuterhoek opruimen", groups: ["Kleuters 2b"] },
-    { task: "Gangen vegen/stofzuigen", groups: ["Jongeren 4"] }
+    { task: "Gymzaal Laagstraat opruimen", groups: ["Kleuters 1A"] },
+    { task: "Gymzaal Wilgenstraat opruimen", groups: ["Kleuters 4A"] },
+    { task: "Keuken opruimen en poetsen", groups: ["Ouderen 1"] },
+    { task: "Toiletten kantine schoonmaken", groups: ["Pupillen 1A"] },
+    { task: "Toiletten gymzalen schoonmaken", groups: ["Kleuters 3A"] },
+    { task: "Binnenplaats opruimen", groups: ["Ouderen 2"] },
+    { task: "Kleuterhoek opruimen", groups: ["Kleuters 2A"] },
+    { task: "Gangen vegen/stofzuigen", groups: ["Pupillen 3A"] }
   ],
   1: [
-    { task: "Toiletten kantine schoonmaken", groups: ["Pupillen 1"] },
-    { task: "Toiletten gymzalen schoonmaken", groups: ["Kleuters 1b"] }
+    { task: "Toiletten kantine schoonmaken", groups: ["Kleuters 1B"] },
+    { task: "Toiletten gymzalen schoonmaken", groups: ["Pupillen 1B"] }
   ],
   2: [
     { task: "Kantine opruimen en poetsen", groups: ["Jongeren 3"] },
-    { task: "Sportveld opruimen", groups: ["Kleuters 3a"] },
-    { task: "Gymzaal Laagstraat opruimen", groups: ["Kleuters 4b"] },
-    { task: "Gymzaal Wilgenstraat opruimen", groups: ["Pupillen 2"] },
-    { task: "Keuken opruimen en poetsen", groups: ["Kleuters 1b"] },
-    { task: "Toiletten kantine schoonmaken", groups: ["Pupillen 3"] },
+    { task: "Sportveld opruimen", groups: ["Kleuters 3B"] },
+    { task: "Gymzaal Laagstraat opruimen", groups: ["Kleuters 4B"] },
+    { task: "Gymzaal Wilgenstraat opruimen", groups: ["Pupillen 2B"] },
+    { task: "Keuken opruimen en poetsen", groups: ["Kleuters 1B"] },
+    { task: "Toiletten kantine schoonmaken", groups: ["Pupillen 3B"] },
     { task: "Toiletten gymzalen schoonmaken", groups: ["Jongeren 4"] },
     { task: "Binnenplaats opruimen", groups: ["Jongeren 2"] },
-    { task: "Kleuterhoek opruimen", groups: ["Kleuters 2b"] },
-    { task: "Gangen vegen/stofzuigen", groups: ["Jongeren 1"] }
+    { task: "Kleuterhoek opruimen", groups: ["Kleuters 2B"] },
+    { task: "Gangen vegen/stofzuigen", groups: ["Pupillen 1B"] }
   ],
   3: [
-    { task: "Kantine opruimen en poetsen", groups: ["Kleuters 3b"] },
-    { task: "Sportveld opruimen", groups: ["Kleuters 2a"] },
+    { task: "Kantine opruimen en poetsen", groups: ["Kleuters 3A"] },
+    { task: "Sportveld opruimen", groups: ["Kleuters 2A"] },
     { task: "Gymzaal Laagstraat opruimen", groups: ["Jongeren 1"] },
-    { task: "Gymzaal Wilgenstraat opruimen", groups: ["Pupillen 2"] },
-    { task: "Keuken opruimen en poetsen", groups: ["Jongeren 2"] },
-    { task: "Toiletten kantine schoonmaken", groups: ["Kleuters 2b"] },
-    { task: "Toiletten gymzalen schoonmaken", groups: ["Kleuters 1a"] },
-    { task: "Binnenplaats opruimen", groups: ["Kleuters 3a"] },
-    { task: "Kleuterhoek opruimen", groups: ["Kleuters 4a"] },
-    { task: "Gangen vegen/stofzuigen", groups: ["Jongeren 3"] }
+    { task: "Gymzaal Wilgenstraat opruimen", groups: ["Pupillen 2A"] },
+    { task: "Keuken opruimen en poetsen", groups: ["Pupillen 3A"] },
+    { task: "Toiletten kantine schoonmaken", groups: ["Ouderen 1"] },
+    { task: "Toiletten gymzalen schoonmaken", groups: ["Kleuters 1A"] },
+    { task: "Binnenplaats opruimen", groups: ["Ouderen 3"] },
+    { task: "Kleuterhoek opruimen", groups: ["Kleuters 4A"] },
+    { task: "Gangen vegen/stofzuigen", groups: ["Pupillen 1A"] }
   ],
   4: [
-    { task: "Kantine opruimen en poetsen", groups: ["Kleuters 3a"] },
-    { task: "Sportveld opruimen", groups: ["Kleuters 2a"] },
-    { task: "Gymzaal Laagstraat opruimen", groups: ["Kleuters 1a"] },
-    { task: "Gymzaal Wilgenstraat opruimen", groups: ["Kleuters 4a"] },
-    { task: "Keuken opruimen en poetsen", groups: ["Pupillen 3"] },
+    { task: "Kantine opruimen en poetsen", groups: ["Kleuters 3B"] },
+    { task: "Sportveld opruimen", groups: ["Kleuters 2B"] },
+    { task: "Gymzaal Laagstraat opruimen", groups: ["Jongeren 3"] },
+    { task: "Gymzaal Wilgenstraat opruimen", groups: ["Pupillen 2B"] },
+    { task: "Keuken opruimen en poetsen", groups: ["Pupillen 3B"] },
     { task: "Toiletten kantine schoonmaken", groups: ["Jongeren 2"] },
     { task: "Toiletten gymzalen schoonmaken", groups: ["Ouderen 3"] },
-    { task: "Binnenplaats opruimen", groups: ["Ouderen 1+2"] },
-    { task: "Kleuterhoek opruimen", groups: ["Kleuters 2b"] },
-    { task: "Gangen vegen/stofzuigen", groups: ["Pupillen 1"] }
+    { task: "Binnenplaats opruimen", groups: ["Ouderen 2"] },
+    { task: "Kleuterhoek opruimen", groups: ["Kleuters 4B"] },
+    { task: "Gangen vegen/stofzuigen", groups: ["Jongeren 4"] }
   ]
 };
 
@@ -4504,8 +4504,8 @@ function renderCleaningAssignment(item) {
 
 function openCleaningRoster(trigger) {
   instructionViewerItems = [{
-    kind: "pdf",
-    url: cleaningRosterPdf,
+    kind: "image",
+    url: cleaningRosterImage,
     name: "Schoonmaakrooster KVW 2026",
     instruction: { title: "Schoonmaakrooster KVW 2026", summary: "", body: "", materials: "", safety: "" }
   }];

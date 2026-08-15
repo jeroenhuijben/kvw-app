@@ -1,9 +1,9 @@
-const CACHE_NAME = "kvw-shell-v1";
+const CACHE_NAME = "kvw-shell-v4-cleaning-roster";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=20260812-iphone-layout",
-  "./app.js?v=20260812-iphone-layout",
+  "./styles.css?v=20260815-roster-mobile",
+  "./app.js?v=20260815-cleaning-roster",
   "./supabase-config.js",
   "./program-data.js?v=20260811-heukelom-route",
   "./timetable-data.js",
@@ -13,7 +13,8 @@ const APP_SHELL = [
   "./manifest.webmanifest",
   "./apple-touch-icon.png",
   "./assets/icons/kvw-app-192.png",
-  "./assets/icons/kvw-app-512.png"
+  "./assets/icons/kvw-app-512.png",
+  "./assets/cleaning/schoonmaakrooster-kvw-2026.jpg"
 ];
 
 self.addEventListener("install", (event) => {

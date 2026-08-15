@@ -1347,6 +1347,67 @@ body.toverland-roster-open {
   line-height: 1.45;
 }
 
+@media (max-width: 600px) {
+  .toverland-roster-modal {
+    padding-top: max(8px, env(safe-area-inset-top));
+  }
+
+  .toverland-roster-sheet {
+    height: calc(100dvh - max(8px, env(safe-area-inset-top)));
+    max-height: none;
+    min-height: 0;
+  }
+
+  .toverland-roster-sheet > header {
+    padding: 12px 14px;
+  }
+
+  .toverland-roster-tabs {
+    margin: 10px 12px 2px;
+  }
+
+  .toverland-roster-content {
+    min-height: 0;
+    gap: 8px;
+    padding: 10px 12px calc(14px + env(safe-area-inset-bottom));
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .toverland-roster-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .toverland-roster-time {
+    min-width: 0;
+    padding: 7px 11px;
+    place-items: center start;
+    border-bottom: 1px solid var(--line);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .toverland-roster-assignments {
+    grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  }
+
+  .toverland-roster-assignment,
+  .toverland-roster-assignment:last-child {
+    min-width: 0;
+    border-right: 1px solid var(--line);
+    border-bottom: 0;
+  }
+
+  .toverland-roster-assignment:last-child {
+    border-right: 0;
+  }
+
+  .toverland-roster-assignment strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
 .toverland-inline-link {
   justify-self: start;
   min-height: 36px;

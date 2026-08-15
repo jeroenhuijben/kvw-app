@@ -61,7 +61,7 @@ window.KVW_PROGRAM_DATA = {
       {
         "time": "12:00",
         "title": "Voorleeskwartier",
-        "detail": "Even een momentje rust met de kleuters. Laat elk kind wat ranja en een koekje halen en kom rustig zitten in de kleuterhoek. Er liggen boeken met sprookjes. Verzamel alle kleuters bij elkaar en de beste voorlezer van de groep leest voor.",
+        "detail": "Even een momentje rust met de kleuters. Laat de groepsleiding ranja en koekjes ophalen voor de hele groep en kom daarna rustig met de kinderen zitten in de kleuterhoek. Er liggen boeken met sprookjes. Verzamel alle kleuters bij elkaar en de beste voorlezer van de groep leest voor.",
         "type": "food",
         "activityId": "programma-kleuters-1-1200-voorleeskwartier"
       },
